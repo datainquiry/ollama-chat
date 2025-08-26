@@ -4,7 +4,6 @@
 #include <gtk/gtk.h>
 #include <json-c/json.h>
 
-#define BASE_URL "http://localhost:11434"
 #define MAX_MESSAGE_LEN 8192
 #define MAX_MODELS 50
 
@@ -19,6 +18,7 @@ typedef struct {
 } ChatMessage;
 
 typedef struct AppData {
+    char *base_url;
     GtkApplication *app;
     GtkWindow *window;
     GtkDropDown *model_dropdown;

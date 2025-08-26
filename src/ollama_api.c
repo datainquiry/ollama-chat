@@ -118,7 +118,7 @@ static void *get_models_thread(void *arg) {
     curl = curl_easy_init();
     if (curl) {
         char url[256];
-        snprintf(url, sizeof(url), "%s/api/tags", BASE_URL);
+        snprintf(url, sizeof(url), "%s/api/tags", app_data->base_url);
         
         curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -199,7 +199,7 @@ static void *send_chat_thread(void *arg) {
     curl = curl_easy_init();
     if (curl) {
         char url[256];
-        snprintf(url, sizeof(url), "%s/api/chat", BASE_URL);
+        snprintf(url, sizeof(url), "%s/api/chat", app_data->base_url);
         
         json_object *payload = json_object_new_object();
         json_object_object_add(payload, "model", json_object_new_string(app_data->current_model));
