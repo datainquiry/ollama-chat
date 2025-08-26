@@ -37,4 +37,4 @@ install_data('data/ollama-chat.desktop',
 
 install_data('data/ollama-chat.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
-  rename: 'ollama-chat.svg')
+  rename: 'dev.datainquiry.ollama-chat.svg')

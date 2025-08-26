@@ -1,0 +1,16 @@
+app-id: dev.datainquiry.ollama-chat
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: ollama-chat
+finish-args:
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --filesystem=home
+modules:
+  - name: ollama-chat
+    buildsystem: meson
+    sources:
+      - type: dir
+        path: ../
