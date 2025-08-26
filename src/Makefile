@@ -1,49 +1,67 @@
-PROGRAM = ollama-chat
-SOURCES = ollama_chat.c ollama_api.c ui.c web_search.c history.c config.c
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -O2
-DEBUG_CFLAGS = -Wall -Wextra -std=c11 -g -DDEBUG -O0
-PKG_CONFIG_PACKAGES = gtk4 libcurl json-c
-CFLAGS += $(shell pkg-config --cflags $(PKG_CONFIG_PACKAGES))
-LDFLAGS = $(shell pkg-config --libs $(PKG_CONFIG_PACKAGES)) -lpthread -luuid
-OBJECTS = $(SOURCES:.c=.o)
+PROGRAM = ollama-chat
 
+# Source files
+SOURCES = ollama_chat.c ollama_api.c ui.c ui_callbacks.c ui_chat_view.c \
+          ui_input.c ui_history.c ui_dialogs.c ui_header.c web_search.c \
+          history.c config.c
+
+# Object files derived from source files
+OBJS = $(SOURCES:.c=.o)
+
+# Compiler and linker flags
+PKG_CONFIG_PACKAGES = gtk4 libcurl json-c
+CFLAGS = -Wall -Wextra -std=c11 -O2 $(shell pkg-config --cflags $(PKG_CONFIG_PACKAGES))
+LDFLAGS = $(shell pkg-config --libs $(PKG_CONFIG_PACKAGES)) -lpthread -luuid
+DEBUG_CFLAGS = -Wall -Wextra -std=c11 -g -DDEBUG -O0 $(shell pkg-config --cflags $(PKG_CONFIG_PACKAGES))
+
+# Default target
 all: $(PROGRAM)
 
-$(PROGRAM): $(OBJECTS)
-	$(CC) $(OBJECTS) -o $(PROGRAM) $(LDFLAGS)
+.PHONY: all clean debug install uninstall desktop-file check-deps
 
+# Link the program
+$(PROGRAM): $(OBJS)
+	$(CC) $(OBJS) -o $(PROGRAM) $(LDFLAGS)
+
+# Compile source files into object files
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-debug: CFLAGS = $(DEBUG_CFLAGS) $(shell pkg-config --cflags $(PKG_CONFIG_PACKAGES))
-debug: $(PROGRAM)
+# Debug build
+debug:
+	$(MAKE) "CFLAGS=$(DEBUG_CFLAGS)" all
 
+# Clean the build directory
 clean:
-	rm -f $(OBJECTS) $(PROGRAM)
+	rm -f $(OBJS) $(PROGRAM)
 
-install: $(PROGRAM)
+# Install the program and desktop file
+install: all desktop-file
 	install -D $(PROGRAM) $(DESTDIR)/usr/local/bin/$(PROGRAM)
-	install -D -m644 ollama-chat.desktop $(DESTDIR)/usr/share/applications/ollama-chat.desktop
+	install -D -m644 $(PROGRAM).desktop $(DESTDIR)/usr/share/applications/$(PROGRAM).desktop
 
+# Uninstall the program and desktop file
 uninstall:
-	rm -f /usr/local/bin/$(PROGRAM)
-	rm -f /usr/share/applications/ollama-chat.desktop
+	rm -f $(DESTDIR)/usr/local/bin/$(PROGRAM)
+	rm -f $(DESTDIR)/usr/share/applications/$(PROGRAM).desktop
 
 # Create desktop entry file
 desktop-file:
 	@echo "Creating desktop entry file..."
-	@echo "[Desktop Entry]" > ollama-chat.desktop
-	@echo "Version=1.0" >> ollama-chat.desktop
-	@echo "Type=Application" >> ollama-chat.desktop
-	@echo "Name=Ollama Chat" >> ollama-chat.desktop
-	@echo "Comment=Chat with AI models using Ollama" >> ollama-chat.desktop
-	@echo "Exec=/usr/local/bin/ollama-chat" >> ollama-chat.desktop
-	@echo "Icon=accessories-text-editor" >> ollama-chat.desktop
-	@echo "Terminal=false" >> ollama-chat.desktop
-	@echo "Categories=Utility;Office;" >> ollama-chat.desktop
+	@echo "[Desktop Entry]" > $(PROGRAM).desktop
+	@echo "Version=1.0" >> $(PROGRAM).desktop
+	@echo "Type=Application" >> $(PROGRAM).desktop
+	@echo "Name=Ollama Chat" >> $(PROGRAM).desktop
+	@echo "Comment=Chat with AI models using Ollama" >> $(PROGRAM).desktop
+	@echo "Exec=/usr/local/bin/$(PROGRAM)" >> $(PROGRAM).desktop
+	@echo "Icon=accessories-text-editor" >> $(PROGRAM).desktop
+	@echo "Terminal=false" >> $(PROGRAM).desktop
+	@echo "Categories=Utility;Office;" >> $(PROGRAM).desktop
 
 # Check dependencies
 check-deps:
 	@echo "Checking dependencies..."
-	@pkg-config --exists $(PKG_CONFIG_PACKAGES) && echo "All dependencies found" || (echo "Missing dependencies. Please install:"; echo "Ubuntu/Debian: sudo apt install libgtk-4-dev libadwaita-1-dev libcurl4"; exit 1)
+	@pkg-config --exists $(PKG_CONFIG_PACKAGES) || \
+		(echo "Missing dependencies. Please install them for your distribution." && exit 1)
+	@echo "All dependencies found."

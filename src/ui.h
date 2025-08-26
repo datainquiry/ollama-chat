@@ -15,6 +15,7 @@ void ui_schedule_scroll_to_bottom(AppData *app_data);
 // Chat view manipulation
 void ui_clear_chat_view(AppData *app_data);
 void ui_redisplay_chat_history(AppData *app_data);
+void on_model_changed(GtkDropDown *dropdown, GParamSpec *pspec, gpointer user_data);
 
 
 #endif // UI_H

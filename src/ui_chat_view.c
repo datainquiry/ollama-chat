@@ -1,0 +1,124 @@
+#include "ui_chat_view.h"
+#include "ui_callbacks.h"
+
+static gboolean revert_copy_icon(gpointer user_data) {
+    gtk_button_set_icon_name(GTK_BUTTON(user_data), "edit-copy-symbolic");
+    return G_SOURCE_REMOVE;
+}
+
+static void on_copy_clicked(GtkButton *button, gpointer user_data) {
+    GtkLabel *content_label = GTK_LABEL(user_data);
+    const char *text = gtk_label_get_text(content_label);
+    gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(content_label)), text);
+    gtk_button_set_icon_name(button, "object-select-symbolic");
+    g_timeout_add(1000, revert_copy_icon, button);
+}
+
+static GtkWidget *create_message_widget(const ChatMessage *message) {
+    GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_widget_set_margin_start(main_box, 12);
+    gtk_widget_set_margin_end(main_box, 12);
+    gtk_widget_set_margin_top(main_box, 6);
+    gtk_widget_set_margin_bottom(main_box, 6);
+    
+    GtkWidget *frame = gtk_frame_new(NULL);
+    gtk_widget_add_css_class(frame, "card");
+    
+    GtkWidget *message_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_widget_set_margin_start(message_box, 12);
+    gtk_widget_set_margin_end(message_box, 12);
+    gtk_widget_set_margin_top(message_box, 8);
+    gtk_widget_set_margin_bottom(message_box, 8);
+
+    GtkWidget *header_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    
+    GtkWidget *sender_label = gtk_label_new(NULL);
+    char *markup = g_markup_printf_escaped("<b>%s</b>", message->is_user ? "You" : "Assistant");
+    gtk_label_set_markup(GTK_LABEL(sender_label), markup);
+    g_free(markup);
+    gtk_widget_set_halign(sender_label, GTK_ALIGN_START);
+    gtk_widget_add_css_class(sender_label, "caption");
+    gtk_box_append(GTK_BOX(header_box), sender_label);
+    
+    GtkWidget *content_label = gtk_label_new(message->content);
+    gtk_label_set_wrap(GTK_LABEL(content_label), TRUE);
+    gtk_label_set_wrap_mode(GTK_LABEL(content_label), PANGO_WRAP_WORD_CHAR);
+    gtk_widget_set_halign(content_label, GTK_ALIGN_START);
+    gtk_label_set_selectable(GTK_LABEL(content_label), TRUE);
+    gtk_label_set_xalign(GTK_LABEL(content_label), 0);
+    
+    gtk_box_append(GTK_BOX(message_box), header_box);
+    gtk_box_append(GTK_BOX(message_box), content_label);
+    gtk_frame_set_child(GTK_FRAME(frame), message_box);
+    
+    if (message->is_user) {
+        gtk_widget_set_halign(main_box, GTK_ALIGN_END);
+        gtk_widget_add_css_class(frame, "user-message");
+    } else {
+        gtk_widget_set_halign(main_box, GTK_ALIGN_START);
+        gtk_widget_add_css_class(frame, "assistant-message");
+
+        GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+        gtk_widget_set_hexpand(spacer, TRUE);
+        gtk_box_append(GTK_BOX(header_box), spacer);
+
+        GtkWidget *copy_btn = gtk_button_new_from_icon_name("edit-copy-symbolic");
+        gtk_widget_add_css_class(copy_btn, "copy-button");
+        g_signal_connect(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), content_label);
+        gtk_box_append(GTK_BOX(header_box), copy_btn);
+    }
+    
+    gtk_box_append(GTK_BOX(main_box), frame);
+    g_object_set_data(G_OBJECT(main_box), "content_label", content_label);
+    return main_box;
+}
+
+GtkWidget *add_message_to_chat(AppData *app_data, const ChatMessage *message) {
+    GtkWidget *widget = create_message_widget(message);
+    gtk_box_append(app_data->chat_box, widget);
+    ui_schedule_scroll_to_bottom(app_data);
+    return widget;
+}
+
+void ui_clear_chat_view(AppData *app_data) {
+    GtkWidget *child;
+    while ((child = gtk_widget_get_first_child(GTK_WIDGET(app_data->chat_box))) != NULL) {
+        gtk_box_remove(app_data->chat_box, child);
+    }
+}
+
+void ui_redisplay_chat_history(AppData *app_data) {
+    if (!app_data->messages_array) return;
+    int len = json_object_array_length(app_data->messages_array);
+    for (int i = 0; i < len; i++) {
+        json_object *msg_obj = json_object_array_get_idx(app_data->messages_array, i);
+        json_object *role_obj, *content_obj;
+        if (json_object_object_get_ex(msg_obj, "role", &role_obj) &&
+            json_object_object_get_ex(msg_obj, "content", &content_obj)) {
+            
+            const char *role = json_object_get_string(role_obj);
+            const char *content = json_object_get_string(content_obj);
+            
+            ChatMessage msg;
+            msg.is_user = (strcmp(role, "user") == 0);
+            strncpy(msg.content, content, MAX_MESSAGE_LEN - 1);
+            msg.content[MAX_MESSAGE_LEN - 1] = '\0';
+            
+            add_message_to_chat(app_data, &msg);
+        }
+    }
+}
+
+GtkWidget *create_chat_view(AppData *app_data) {
+    GtkWidget *chat_area_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(chat_area_box, TRUE);
+
+    app_data->chat_scroll = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new());
+    gtk_scrolled_window_set_policy(app_data->chat_scroll, GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_vexpand(GTK_WIDGET(app_data->chat_scroll), TRUE);
+    app_data->chat_box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0));
+    gtk_scrolled_window_set_child(app_data->chat_scroll, GTK_WIDGET(app_data->chat_box));
+    gtk_box_append(GTK_BOX(chat_area_box), GTK_WIDGET(app_data->chat_scroll));
+
+    return chat_area_box;
+}
