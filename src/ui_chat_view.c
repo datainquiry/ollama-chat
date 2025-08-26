@@ -10,7 +10,7 @@ static gboolean revert_copy_icon(gpointer user_data) {
 
 static void on_copy_clicked(GtkButton *button, gpointer user_data) {
     const char *text = (const char *)user_data;
-    gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(button)), text);
+    gdk_clipboard_set_text(gdk_display_get_clipboard(gtk_widget_get_display(GTK_WIDGET(button))), text);
     gtk_button_set_icon_name(button, "object-select-symbolic");
     g_timeout_add(1000, revert_copy_icon, button);
 }
@@ -108,7 +108,7 @@ static void add_assistant_message_actions(GtkBox *header_box, const char *conten
 
     GtkWidget *copy_btn = gtk_button_new_from_icon_name("edit-copy-symbolic");
     gtk_widget_add_css_class(copy_btn, "copy-button");
-    g_signal_connect(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), (gpointer)content);
+    g_signal_connect_data(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), g_strdup(content), (GClosureNotify)g_free, 0);
     gtk_box_append(header_box, copy_btn);
 }
 
