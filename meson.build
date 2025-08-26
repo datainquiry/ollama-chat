@@ -1,5 +1,5 @@
 project('ollama-chat', 'c',
-  version : '1.0.0',
+  version : '0.1.1',
   default_options : ['c_std=c11', 'warning_level=2'])
 
 dependencies = [
