@@ -118,39 +118,36 @@ static void on_send_clicked(GtkButton *button, gpointer user_data) {
     }
 }
 
-static void on_file_chooser_response(GtkNativeDialog *native, int response_id, gpointer user_data) {
-    if (response_id == GTK_RESPONSE_ACCEPT) {
-        AppData *app_data = (AppData *)user_data;
-        GtkFileChooser *chooser = GTK_FILE_CHOOSER(native);
-        GFile *file = gtk_file_chooser_get_file(chooser);
-        if (file) {
-            char *filename = g_file_get_basename(file);
-            if (filename) {
-                GtkTextIter iter;
-                gtk_text_buffer_get_iter_at_mark(app_data->text_buffer, &iter, gtk_text_buffer_get_insert(app_data->text_buffer));
-                gunichar prev_char = gtk_text_iter_get_char(&iter);
-                if (prev_char != '@' && gtk_text_iter_backward_char(&iter)) {
-                    prev_char = gtk_text_iter_get_char(&iter);
-                }
-                if (prev_char == '@') {
-                     GtkTextIter end_iter = iter;
-                     gtk_text_iter_forward_char(&end_iter);
-                     gtk_text_buffer_delete(app_data->text_buffer, &iter, &end_iter);
-                }
-                gtk_text_buffer_insert(app_data->text_buffer, &iter, "@", 1);
-                gtk_text_buffer_insert(app_data->text_buffer, &iter, filename, -1);
-                g_free(filename);
+static void on_open_file_dialog_finish(GObject *source_object, GAsyncResult *res, gpointer user_data) {
+    GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
+    AppData *app_data = (AppData *)user_data;
+    GFile *file = gtk_file_dialog_open_finish(dialog, res, NULL);
+    if (file) {
+        char *filename = g_file_get_basename(file);
+        if (filename) {
+            GtkTextIter iter;
+            gtk_text_buffer_get_iter_at_mark(app_data->text_buffer, &iter, gtk_text_buffer_get_insert(app_data->text_buffer));
+            gunichar prev_char = gtk_text_iter_get_char(&iter);
+            if (prev_char != '@' && gtk_text_iter_backward_char(&iter)) {
+                prev_char = gtk_text_iter_get_char(&iter);
             }
-            g_object_unref(file);
+            if (prev_char == '@') {
+                 GtkTextIter end_iter = iter;
+                 gtk_text_iter_forward_char(&end_iter);
+                 gtk_text_buffer_delete(app_data->text_buffer, &iter, &end_iter);
+            }
+            gtk_text_buffer_insert(app_data->text_buffer, &iter, "@", 1);
+            gtk_text_buffer_insert(app_data->text_buffer, &iter, filename, -1);
+            g_free(filename);
         }
+        g_object_unref(file);
     }
-    g_object_unref(native);
 }
 
 static void open_file_dialog(AppData *app_data) {
-    GtkFileChooserNative *native = gtk_file_chooser_native_new("Open File", GTK_WINDOW(app_data->window), GTK_FILE_CHOOSER_ACTION_OPEN, "_Open", "_Cancel");
-    g_signal_connect(native, "response", G_CALLBACK(on_file_chooser_response), app_data);
-    gtk_native_dialog_show(GTK_NATIVE_DIALOG(native));
+    GtkFileDialog *dialog = gtk_file_dialog_new();
+    gtk_file_dialog_open(dialog, GTK_WINDOW(app_data->window), NULL, on_open_file_dialog_finish, app_data);
+    g_object_unref(dialog);
 }
 
 static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data) {

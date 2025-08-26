@@ -51,13 +51,63 @@ static void on_delete_chat_action(GSimpleAction *action, GVariant *parameter, gp
     }
 }
 
+static void on_new_chat_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    (void)action;
+    (void)parameter;
+    history_start_new_chat((AppData *)user_data);
+}
+
+static void on_refresh_models_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    (void)action;
+    (void)parameter;
+    api_get_models((AppData *)user_data);
+}
+
+static void on_preferences_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    (void)action;
+    (void)parameter;
+    show_preferences_dialog((AppData *)user_data);
+}
+
+static void on_toggle_history_panel_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    (void)action;
+    (void)parameter;
+    AppData *app_data = (AppData *)user_data;
+    app_data->history_panel_visible = !app_data->history_panel_visible;
+    gtk_revealer_set_reveal_child(app_data->history_revealer, app_data->history_panel_visible);
+}
+
+
+static void on_quit_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    (void)action;
+    (void)parameter;
+    GApplication *app = G_APPLICATION(user_data);
+    g_application_quit(app);
+}
+
 GtkWidget *create_header_bar(AppData *app_data) {
     const GActionEntry app_entries[] = {
-        { "rename-chat", on_rename_chat_action, NULL, NULL, NULL },
-        { "delete-chat", on_delete_chat_action, NULL, NULL, NULL },
-        { "about", on_about_action, NULL, NULL, NULL }
+        { "new-chat", on_new_chat_action, NULL, NULL, NULL, {0} },
+        { "refresh-models", on_refresh_models_action, NULL, NULL, NULL, {0} },
+        { "preferences", on_preferences_action, NULL, NULL, NULL, {0} },
+        { "toggle-history", on_toggle_history_panel_action, NULL, NULL, NULL, {0} },
+        { "about", on_about_action, NULL, NULL, NULL, {0} },
+        { "rename-chat", on_rename_chat_action, NULL, NULL, NULL, {0} },
+        { "delete-chat", on_delete_chat_action, NULL, NULL, NULL, {0} },
+        { "quit", on_quit_action, NULL, NULL, NULL, {0} }
     };
     g_action_map_add_action_entries(G_ACTION_MAP(app_data->app), app_entries, G_N_ELEMENTS(app_entries), app_data);
+
+    const char *accels_for_new_chat[] = { "<Control>n", NULL };
+    const char *accels_for_refresh_models[] = { "<Control>r", NULL };
+    const char *accels_for_preferences[] = { "<Control>comma", NULL };
+    const char *accels_for_toggle_history[] = { "<Control>h", NULL };
+    const char *accels_for_quit[] = { "<Control>q", NULL };
+    gtk_application_set_accels_for_action(app_data->app, "app.new-chat", accels_for_new_chat);
+    gtk_application_set_accels_for_action(app_data->app, "app.refresh-models", accels_for_refresh_models);
+    gtk_application_set_accels_for_action(app_data->app, "app.preferences", accels_for_preferences);
+    gtk_application_set_accels_for_action(app_data->app, "app.toggle-history", accels_for_toggle_history);
+    gtk_application_set_accels_for_action(app_data->app, "app.quit", accels_for_quit);
 
     GtkWidget *header = gtk_header_bar_new();
 

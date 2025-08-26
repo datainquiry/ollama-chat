@@ -12,39 +12,46 @@ typedef struct {
     AppData *app_data;
 } PrefsWidgets;
 
-static void on_prefs_dialog_response(GtkDialog *dialog, int response_id, gpointer user_data) {
+static void on_prefs_dialog_response(GtkButton *button, gpointer user_data) {
+    (void)button;
     PrefsWidgets *prefs_widgets = (PrefsWidgets *)user_data;
-    if (response_id == GTK_RESPONSE_ACCEPT) {
-        AppData *app_data = prefs_widgets->app_data;
-        app_data->temperature = gtk_spin_button_get_value(prefs_widgets->temperature_spin);
-        app_data->top_p = gtk_spin_button_get_value(prefs_widgets->top_p_spin);
-        app_data->top_k = (int)gtk_spin_button_get_value(prefs_widgets->top_k_spin);
-        app_data->seed = (int)gtk_spin_button_get_value(prefs_widgets->seed_spin);
-        app_data->ollama_context_size = (int)gtk_spin_button_get_value(prefs_widgets->context_length_spin);
+    AppData *app_data = prefs_widgets->app_data;
+    app_data->temperature = gtk_spin_button_get_value(prefs_widgets->temperature_spin);
+    app_data->top_p = gtk_spin_button_get_value(prefs_widgets->top_p_spin);
+    app_data->top_k = (int)gtk_spin_button_get_value(prefs_widgets->top_k_spin);
+    app_data->seed = (int)gtk_spin_button_get_value(prefs_widgets->seed_spin);
+    app_data->ollama_context_size = (int)gtk_spin_button_get_value(prefs_widgets->context_length_spin);
 
-        GtkTextBuffer *buffer = gtk_text_view_get_buffer(prefs_widgets->system_prompt_view);
-        GtkTextIter start, end;
-        gtk_text_buffer_get_bounds(buffer, &start, &end);
-        char *system_prompt_text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-        if (app_data->system_prompt) g_free(app_data->system_prompt);
-        app_data->system_prompt = g_strdup(system_prompt_text);
-        g_free(system_prompt_text);
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(prefs_widgets->system_prompt_view);
+    GtkTextIter start, end;
+    gtk_text_buffer_get_bounds(buffer, &start, &end);
+    char *system_prompt_text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+    if (app_data->system_prompt) g_free(app_data->system_prompt);
+    app_data->system_prompt = g_strdup(system_prompt_text);
+    g_free(system_prompt_text);
 
-        config_save(app_data);
-    }
+    config_save(app_data);
     g_free(prefs_widgets);
-    gtk_window_destroy(GTK_WINDOW(dialog));
 }
 
 void show_preferences_dialog(AppData *app_data) {
-    GtkWidget *dialog = gtk_dialog_new_with_buttons("Preferences",
-                                                    GTK_WINDOW(app_data->window),
-                                                    GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-                                                    "_Cancel", GTK_RESPONSE_CANCEL,
-                                                    "_Save", GTK_RESPONSE_ACCEPT,
-                                                    NULL);
+    GtkWidget *dialog = gtk_window_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), "Preferences");
+    gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(app_data->window));
+    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+    gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 400, -1);
 
-    GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_window_set_child(GTK_WINDOW(dialog), main_box);
+
+    GtkWidget *content_area = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_margin_start(content_area, 12);
+    gtk_widget_set_margin_end(content_area, 12);
+    gtk_widget_set_margin_top(content_area, 12);
+    gtk_widget_set_margin_bottom(content_area, 12);
+    gtk_box_append(GTK_BOX(main_box), content_area);
+
     GtkWidget *grid = gtk_grid_new();
     gtk_widget_set_margin_start(grid, 12);
     gtk_widget_set_margin_end(grid, 12);
@@ -113,39 +120,71 @@ void show_preferences_dialog(AppData *app_data) {
     gtk_grid_attach(GTK_GRID(grid), system_prompt_label, 0, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), scrolled_window, 1, row++, 1, 1);
 
-    g_signal_connect(dialog, "response", G_CALLBACK(on_prefs_dialog_response), prefs_widgets);
+    GtkWidget *action_area = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_widget_set_halign(action_area, GTK_ALIGN_END);
+    gtk_widget_set_margin_top(action_area, 12);
+    gtk_box_append(GTK_BOX(main_box), action_area);
+
+    GtkWidget *cancel_button = gtk_button_new_with_label("Cancel");
+    g_signal_connect_swapped(cancel_button, "clicked", G_CALLBACK(gtk_window_destroy), dialog);
+    gtk_box_append(GTK_BOX(action_area), cancel_button);
+
+    GtkWidget *save_button = gtk_button_new_with_label("Save");
+    gtk_widget_add_css_class(save_button, "suggested-action");
+    g_signal_connect(save_button, "clicked", G_CALLBACK(on_prefs_dialog_response), prefs_widgets);
+    g_signal_connect_swapped(save_button, "clicked", G_CALLBACK(gtk_window_destroy), dialog);
+    gtk_box_append(GTK_BOX(action_area), save_button);
+
     gtk_window_present(GTK_WINDOW(dialog));
 }
 
-static void on_rename_dialog_response(GtkDialog *dialog, int response_id, gpointer user_data) {
-    if (response_id == GTK_RESPONSE_ACCEPT) {
-        AppData *app_data = (AppData *)user_data;
-        GtkWidget *content_area = gtk_dialog_get_content_area(dialog);
-        GtkWidget *entry = gtk_widget_get_first_child(content_area);
-        const char *new_name = gtk_editable_get_text(GTK_EDITABLE(entry));
-        
-        GtkListBoxRow *row = gtk_list_box_get_selected_row(app_data->history_list_box);
-        if (row && strlen(new_name) > 0) {
-            const char *old_name = gtk_label_get_text(GTK_LABEL(gtk_list_box_row_get_child(row)));
-            history_rename_chat(app_data, old_name, new_name);
-        }
+static void on_rename_dialog_response(GtkButton *button, gpointer user_data) {
+    (void)button;
+    AppData *app_data = (AppData *)user_data;
+    GtkWidget *window = gtk_widget_get_ancestor(GTK_WIDGET(button), GTK_TYPE_WINDOW);
+    GtkWidget *main_box = gtk_window_get_child(GTK_WINDOW(window));
+    GtkWidget *entry = gtk_widget_get_first_child(main_box);
+    const char *new_name = gtk_editable_get_text(GTK_EDITABLE(entry));
+    
+    GtkListBoxRow *row = gtk_list_box_get_selected_row(app_data->history_list_box);
+    if (row && strlen(new_name) > 0) {
+        const char *old_name = gtk_label_get_text(GTK_LABEL(gtk_list_box_row_get_child(row)));
+        history_rename_chat(app_data, old_name, new_name);
     }
-    gtk_window_destroy(GTK_WINDOW(dialog));
 }
 
 void show_rename_dialog(AppData *app_data, const char *old_name) {
-    GtkWidget *dialog = gtk_dialog_new_with_buttons("Rename Chat",
-                                                    GTK_WINDOW(app_data->window),
-                                                    GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-                                                    "_Cancel", GTK_RESPONSE_CANCEL,
-                                                    "_Rename", GTK_RESPONSE_ACCEPT,
-                                                    NULL);
-    GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    GtkWidget *dialog = gtk_window_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), "Rename Chat");
+    gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(app_data->window));
+    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+    gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
+
+    GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_widget_set_margin_start(main_box, 12);
+    gtk_widget_set_margin_end(main_box, 12);
+    gtk_widget_set_margin_top(main_box, 12);
+    gtk_widget_set_margin_bottom(main_box, 12);
+    gtk_window_set_child(GTK_WINDOW(dialog), main_box);
+
     GtkWidget *entry = gtk_entry_new();
     gtk_editable_set_text(GTK_EDITABLE(entry), old_name);
-    gtk_box_append(GTK_BOX(content_area), entry);
+    gtk_box_append(GTK_BOX(main_box), entry);
 
-    g_signal_connect(dialog, "response", G_CALLBACK(on_rename_dialog_response), app_data);
+    GtkWidget *action_area = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_widget_set_halign(action_area, GTK_ALIGN_END);
+    gtk_box_append(GTK_BOX(main_box), action_area);
+
+    GtkWidget *cancel_button = gtk_button_new_with_label("Cancel");
+    g_signal_connect_swapped(cancel_button, "clicked", G_CALLBACK(gtk_window_destroy), dialog);
+    gtk_box_append(GTK_BOX(action_area), cancel_button);
+
+    GtkWidget *rename_button = gtk_button_new_with_label("Rename");
+    gtk_widget_add_css_class(rename_button, "suggested-action");
+    g_signal_connect(rename_button, "clicked", G_CALLBACK(on_rename_dialog_response), app_data);
+    g_signal_connect_swapped(rename_button, "clicked", G_CALLBACK(gtk_window_destroy), dialog);
+    gtk_box_append(GTK_BOX(action_area), rename_button);
+
     gtk_window_present(GTK_WINDOW(dialog));
 }
 

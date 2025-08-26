@@ -33,6 +33,16 @@ The Preferences dialog allows you to customize the behavior of the Ollama model:
 *   **Context Length:** The maximum number of tokens to keep in the conversation history.
 *   **System Prompt:** A custom instruction that is always prepended to the conversation history, allowing you to guide the model's behavior.
 
+## Keyboard Shortcuts
+
+| Shortcut      | Action               |
+|---------------|----------------------|
+| `Ctrl+N`      | New Chat             |
+| `Ctrl+R`      | Refresh Models       |
+| `Ctrl+,`      | Open Preferences     |
+| `Ctrl+H`      | Toggle History Panel |
+| `Ctrl+Q`      | Quit Application     |
+
 ## Dependencies
 
 To build and run Ollama Chat, you will need the following libraries:

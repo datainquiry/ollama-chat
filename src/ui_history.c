@@ -11,6 +11,7 @@ static GtkWidget* create_history_row(gpointer item, gpointer user_data) {
 }
 
 static void on_history_context_menu(GtkGestureClick *gesture, int n_press, double x, double y, gpointer user_data) {
+    (void)x;
     AppData *app_data = (AppData *)user_data;
     GtkListBoxRow *row = gtk_list_box_get_row_at_y(app_data->history_list_box, y);
 
@@ -24,9 +25,14 @@ static void on_history_context_menu(GtkGestureClick *gesture, int n_press, doubl
         GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
         gtk_widget_set_parent(popover, GTK_WIDGET(app_data->history_list_box));
 
-        GtkAllocation allocation;
-        gtk_widget_get_allocation(GTK_WIDGET(row), &allocation);
-        GdkRectangle rect = { .x = allocation.x, .y = allocation.y, .width = allocation.width, .height = allocation.height };
+        graphene_rect_t bounds;
+        gtk_widget_compute_bounds(GTK_WIDGET(row), GTK_WIDGET(app_data->history_list_box), &bounds);
+        GdkRectangle rect = {
+            .x = bounds.origin.x,
+            .y = bounds.origin.y,
+            .width = bounds.size.width,
+            .height = bounds.size.height
+        };
 
         gtk_popover_set_pointing_to(GTK_POPOVER(popover), &rect);
         gtk_popover_popup(GTK_POPOVER(popover));
