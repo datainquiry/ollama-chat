@@ -2,7 +2,7 @@
 
 A simple and lightweight GTK4 chat application for interacting with local Ollama AI models.
 
-![Ollama Chat Screenshot](https://raw.githubusercontent.com/data-inquiry/ollama-chat/main/screenshot.png)
+![Ollama Chat Screenshot](./screenshot.png)
 
 ## Features
 
