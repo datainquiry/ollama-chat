@@ -36,6 +36,9 @@ typedef struct {
 } StreamData;
 
 static size_t stream_callback(void *contents, size_t size, size_t nmemb, StreamData *stream_data) {
+    if (stream_data->app_data->request_cancelled) {
+        return -1; // Abort the stream
+    }
     size_t real_size = size * nmemb;
 
     if (stream_data->buffer_pos + real_size >= STREAM_BUFFER_SIZE) {
@@ -246,7 +249,9 @@ static void *send_chat_thread(void *arg) {
         curl_easy_cleanup(curl);
         json_object_put(payload);
         
-        if (res != CURLE_OK) {
+        if (res != CURLE_OK && res != CURLE_WRITE_ERROR) {
+            ui_schedule_reset_send_button(app_data);
+        } else if (res == CURLE_WRITE_ERROR && app_data->request_cancelled) {
             ui_schedule_reset_send_button(app_data);
         }
     }

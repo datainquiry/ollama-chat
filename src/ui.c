@@ -42,8 +42,11 @@ static gboolean update_response_label_cb(gpointer data) {
 static gboolean finalize_generation_cb(gpointer data) {
     AppData *app_data = (AppData *)data;
     app_data->is_generating = FALSE;
-    gtk_button_set_label(app_data->send_btn, "Send");
     gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), TRUE);
+    gtk_button_set_icon_name(app_data->send_btn, "document-send-symbolic");
+    gtk_widget_set_tooltip_text(GTK_WIDGET(app_data->send_btn), "Send Message");
+    gtk_spinner_stop(app_data->spinner);
+    gtk_widget_set_visible(GTK_WIDGET(app_data->spinner), FALSE);
 
     if (app_data->current_response_label) {
         const char *final_text = gtk_label_get_text(app_data->current_response_label);
@@ -119,8 +122,11 @@ static gboolean update_models_dropdown_cb(gpointer data) {
 static gboolean reset_send_button_cb(gpointer data) {
     AppData *app_data = (AppData *)data;
     app_data->is_generating = FALSE;
-    gtk_button_set_label(app_data->send_btn, "Send");
     gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), TRUE);
+    gtk_button_set_icon_name(app_data->send_btn, "document-send-symbolic");
+    gtk_widget_set_tooltip_text(GTK_WIDGET(app_data->send_btn), "Send Message");
+    gtk_spinner_stop(app_data->spinner);
+    gtk_widget_set_visible(GTK_WIDGET(app_data->spinner), FALSE);
     return G_SOURCE_REMOVE;
 }
 
@@ -184,6 +190,35 @@ void ui_redisplay_chat_history(AppData *app_data) {
 
 // --- UI building and event handling ---
 
+static gboolean is_binary_file(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (!file) return FALSE; // Assume not binary if we can't open it
+
+    unsigned char buffer[1024];
+    size_t bytes_read = fread(buffer, 1, sizeof(buffer), file);
+    fclose(file);
+
+    for (size_t i = 0; i < bytes_read; i++) {
+        if (buffer[i] == 0) {
+            return TRUE; // Null byte found, likely binary
+        }
+    }
+    return FALSE;
+}
+
+static gboolean revert_copy_icon(gpointer user_data) {
+    gtk_button_set_icon_name(GTK_BUTTON(user_data), "edit-copy-symbolic");
+    return G_SOURCE_REMOVE;
+}
+
+static void on_copy_clicked(GtkButton *button, gpointer user_data) {
+    GtkLabel *content_label = GTK_LABEL(user_data);
+    const char *text = gtk_label_get_text(content_label);
+    gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(content_label)), text);
+    gtk_button_set_icon_name(button, "object-select-symbolic");
+    g_timeout_add(1000, revert_copy_icon, button);
+}
+
 static GtkWidget *create_message_widget(const ChatMessage *message) {
     GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
     gtk_widget_set_margin_start(main_box, 12);
@@ -199,6 +234,8 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     gtk_widget_set_margin_end(message_box, 12);
     gtk_widget_set_margin_top(message_box, 8);
     gtk_widget_set_margin_bottom(message_box, 8);
+
+    GtkWidget *header_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     
     GtkWidget *sender_label = gtk_label_new(NULL);
     char *markup = g_markup_printf_escaped("<b>%s</b>", message->is_user ? "You" : "Assistant");
@@ -206,6 +243,7 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     g_free(markup);
     gtk_widget_set_halign(sender_label, GTK_ALIGN_START);
     gtk_widget_add_css_class(sender_label, "caption");
+    gtk_box_append(GTK_BOX(header_box), sender_label);
     
     GtkWidget *content_label = gtk_label_new(message->content);
     gtk_label_set_wrap(GTK_LABEL(content_label), TRUE);
@@ -214,7 +252,7 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     gtk_label_set_selectable(GTK_LABEL(content_label), TRUE);
     gtk_label_set_xalign(GTK_LABEL(content_label), 0);
     
-    gtk_box_append(GTK_BOX(message_box), sender_label);
+    gtk_box_append(GTK_BOX(message_box), header_box);
     gtk_box_append(GTK_BOX(message_box), content_label);
     gtk_frame_set_child(GTK_FRAME(frame), message_box);
     
@@ -224,6 +262,15 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     } else {
         gtk_widget_set_halign(main_box, GTK_ALIGN_START);
         gtk_widget_add_css_class(frame, "assistant-message");
+
+        GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+        gtk_widget_set_hexpand(spacer, TRUE);
+        gtk_box_append(GTK_BOX(header_box), spacer);
+
+        GtkWidget *copy_btn = gtk_button_new_from_icon_name("edit-copy-symbolic");
+        gtk_widget_add_css_class(copy_btn, "copy-button");
+        g_signal_connect(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), content_label);
+        gtk_box_append(GTK_BOX(header_box), copy_btn);
     }
     
     gtk_box_append(GTK_BOX(main_box), frame);
@@ -241,6 +288,13 @@ static GtkWidget *add_message_to_chat(AppData *app_data, const ChatMessage *mess
 static void on_new_chat_clicked(GtkButton *button, gpointer user_data) {
     (void)button;
     history_start_new_chat((AppData *)user_data);
+}
+
+static void on_toggle_history_panel_clicked(GtkButton *button, gpointer user_data) {
+    (void)button;
+    AppData *app_data = (AppData *)user_data;
+    app_data->history_panel_visible = !app_data->history_panel_visible;
+    gtk_revealer_set_reveal_child(app_data->history_revealer, app_data->history_panel_visible);
 }
 
 static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
@@ -297,14 +351,18 @@ static void send_message(AppData *app_data) {
                 char *match = g_match_info_fetch(match_info, 0);
                 if (match) {
                     char *filename = match + 1;
-                    char *file_content = NULL;
-                    GError *error = NULL;
-                    if (g_file_get_contents(filename, &file_content, NULL, &error)) {
-                        g_string_append_printf(prepended_content, "Content from file %s:\n\n%s\n\n---\n\n", filename, file_content);
-                        g_free(file_content);
+                    if (is_binary_file(filename)) {
+                        g_string_append_printf(prepended_content, "Content from binary file %s was not included.\n\n", filename);
                     } else {
-                        fprintf(stderr, "Error reading file %s: %s\n", filename, error->message);
-                        g_error_free(error);
+                        char *file_content = NULL;
+                        GError *error = NULL;
+                        if (g_file_get_contents(filename, &file_content, NULL, &error)) {
+                            g_string_append_printf(prepended_content, "Content from file %s:\n\n%s\n\n---\n\n", filename, file_content);
+                            g_free(file_content);
+                        } else {
+                            fprintf(stderr, "Error reading file %s: %s\n", filename, error->message);
+                            g_error_free(error);
+                        }
                     }
                     g_free(match);
                 }
@@ -334,8 +392,12 @@ static void send_message(AppData *app_data) {
         app_data->current_response_label = GTK_LABEL(g_object_get_data(G_OBJECT(app_data->current_response_widget), "content_label"));
 
         app_data->is_generating = TRUE;
-        gtk_button_set_label(app_data->send_btn, "Generating...");
-        gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), FALSE);
+        app_data->request_cancelled = FALSE;
+        gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), TRUE);
+        gtk_button_set_icon_name(app_data->send_btn, "media-playback-stop-symbolic");
+        gtk_widget_set_tooltip_text(GTK_WIDGET(app_data->send_btn), "Cancel Request");
+        gtk_widget_set_visible(GTK_WIDGET(app_data->spinner), TRUE);
+        gtk_spinner_start(app_data->spinner);
 
         api_send_chat(app_data, final_text_to_send);
     }
@@ -391,7 +453,12 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
 
 static void on_send_clicked(GtkButton *button, gpointer user_data) {
     (void)button;
-    send_message((AppData *)user_data);
+    AppData *app_data = (AppData *)user_data;
+    if (app_data->is_generating) {
+        app_data->request_cancelled = TRUE;
+    } else {
+        send_message(app_data);
+    }
 }
 
 typedef struct {
@@ -589,6 +656,22 @@ static void on_delete_chat_action(GSimpleAction *action, GVariant *parameter, gp
     }
 }
 
+static void on_about_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    (void)action;
+    (void)parameter;
+    AppData *app_data = (AppData *)user_data;
+
+    const char *authors[] = {"Data Inquiry Consulting LLC", NULL};
+
+    gtk_show_about_dialog(GTK_WINDOW(app_data->window),
+                          "program-name", "Ollama Chat",
+                          "version", "1.0.0",
+                          "copyright", "© 2025, Data Inquiry Consulting LLC",
+                          "authors", authors,
+                          "logo-icon-name", "com.example.ollama-chat",
+                          NULL);
+}
+
 static GtkWidget* create_history_row(gpointer item, gpointer user_data) {
     (void)user_data;
     GtkStringObject *str_obj = GTK_STRING_OBJECT(item);
@@ -613,13 +696,19 @@ void ui_build(GtkApplication *app, AppData *app_data) {
     // --- Actions for context menu ---
     const GActionEntry app_entries[] = {
         { "rename-chat", on_rename_chat_action, NULL, NULL, NULL },
-        { "delete-chat", on_delete_chat_action, NULL, NULL, NULL }
+        { "delete-chat", on_delete_chat_action, NULL, NULL, NULL },
+        { "about", on_about_action, NULL, NULL, NULL }
     };
     g_action_map_add_action_entries(G_ACTION_MAP(app), app_entries, G_N_ELEMENTS(app_entries), app_data);
 
 
     GtkWidget *header = gtk_header_bar_new();
     gtk_window_set_titlebar(GTK_WINDOW(app_data->window), header);
+
+    GtkWidget *toggle_history_btn = gtk_button_new_from_icon_name("sidebar-show-symbolic");
+    gtk_widget_set_tooltip_text(toggle_history_btn, "Toggle History Panel");
+    g_signal_connect(toggle_history_btn, "clicked", G_CALLBACK(on_toggle_history_panel_clicked), app_data);
+    gtk_header_bar_pack_start(GTK_HEADER_BAR(header), toggle_history_btn);
 
     GtkWidget *new_chat_btn = gtk_button_new_from_icon_name("document-new-symbolic");
     gtk_widget_set_tooltip_text(new_chat_btn, "New Chat");
@@ -638,26 +727,39 @@ void ui_build(GtkApplication *app, AppData *app_data) {
     GtkWidget *prefs_btn = gtk_button_new_from_icon_name("emblem-system-symbolic");
     gtk_widget_set_tooltip_text(prefs_btn, "Preferences");
     g_signal_connect(prefs_btn, "clicked", G_CALLBACK(on_preferences_clicked), app_data);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), prefs_btn);
+    gtk_header_bar_pack_start(GTK_HEADER_BAR(header), prefs_btn);
+
+    GMenu *menu = g_menu_new();
+    g_menu_append(menu, "About", "app.about");
+    GtkWidget *menu_button = gtk_menu_button_new();
+    gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(menu_button), "open-menu-symbolic");
+    gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(menu_button), G_MENU_MODEL(menu));
+    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), menu_button);
+    g_object_unref(menu);
 
     app_data->status_label = GTK_LABEL(gtk_label_new("Disconnected"));
     gtk_widget_add_css_class(GTK_WIDGET(app_data->status_label), "caption");
     gtk_header_bar_pack_end(GTK_HEADER_BAR(header), GTK_WIDGET(app_data->status_label));
 
-    GtkWidget *main_paned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_window_set_child(GTK_WINDOW(app_data->window), main_paned);
+    GtkWidget *main_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_window_set_child(GTK_WINDOW(app_data->window), main_box);
 
     // --- Left Panel: History ---
+    app_data->history_revealer = GTK_REVEALER(gtk_revealer_new());
+    gtk_revealer_set_transition_type(app_data->history_revealer, GTK_REVEALER_TRANSITION_TYPE_SLIDE_RIGHT);
+    gtk_revealer_set_reveal_child(app_data->history_revealer, app_data->history_panel_visible);
+
     GtkWidget *history_scroll = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(history_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_size_request(history_scroll, 250, -1);
     app_data->history_list_box = GTK_LIST_BOX(gtk_list_box_new());
     gtk_list_box_set_selection_mode(app_data->history_list_box, GTK_SELECTION_SINGLE);
     
     gtk_list_box_bind_model(app_data->history_list_box, G_LIST_MODEL(app_data->history_store), create_history_row, NULL, NULL);
 
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(history_scroll), GTK_WIDGET(app_data->history_list_box));
-    gtk_paned_set_start_child(GTK_PANED(main_paned), history_scroll);
-    gtk_paned_set_position(GTK_PANED(main_paned), 1024 * 0.25);
+    gtk_revealer_set_child(app_data->history_revealer, history_scroll);
+    gtk_box_append(GTK_BOX(main_box), GTK_WIDGET(app_data->history_revealer));
     
     g_signal_connect(app_data->history_list_box, "row-activated", G_CALLBACK(history_load_selected_chat), app_data);
 
@@ -669,8 +771,8 @@ void ui_build(GtkApplication *app, AppData *app_data) {
 
     // --- Right Panel: Chat View ---
     GtkWidget *chat_area_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_paned_set_end_child(GTK_PANED(main_paned), chat_area_box);
-    gtk_paned_set_resize_end_child(GTK_PANED(main_paned), TRUE);
+    gtk_widget_set_hexpand(chat_area_box, TRUE);
+    gtk_box_append(GTK_BOX(main_box), chat_area_box);
 
     app_data->chat_scroll = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new());
     gtk_scrolled_window_set_policy(app_data->chat_scroll, GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
@@ -698,12 +800,17 @@ void ui_build(GtkApplication *app, AppData *app_data) {
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(text_scroll), GTK_WIDGET(app_data->text_view));
     gtk_widget_set_hexpand(text_scroll, TRUE);
     
-    app_data->send_btn = GTK_BUTTON(gtk_button_new_with_label("Send"));
+    app_data->send_btn = GTK_BUTTON(gtk_button_new_from_icon_name("document-send-symbolic"));
+    gtk_widget_set_tooltip_text(GTK_WIDGET(app_data->send_btn), "Send Message");
     gtk_widget_add_css_class(GTK_WIDGET(app_data->send_btn), "suggested-action");
     gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), FALSE);
     g_signal_connect(app_data->send_btn, "clicked", G_CALLBACK(on_send_clicked), app_data);
+
+    app_data->spinner = GTK_SPINNER(gtk_spinner_new());
+    gtk_widget_set_visible(GTK_WIDGET(app_data->spinner), FALSE);
     
     gtk_box_append(GTK_BOX(input_box), text_scroll);
+    gtk_box_append(GTK_BOX(input_box), GTK_WIDGET(app_data->spinner));
     gtk_box_append(GTK_BOX(input_box), GTK_WIDGET(app_data->send_btn));
     gtk_frame_set_child(GTK_FRAME(input_frame), input_box);
     gtk_box_append(GTK_BOX(chat_area_box), input_frame);
@@ -718,7 +825,8 @@ void ui_build(GtkApplication *app, AppData *app_data) {
     const char *css = ".user-message { background: alpha(@accent_color, 0.1); }\n"
                      ".assistant-message { background: alpha(@theme_fg_color, 0.05); }\n"
                      ".success { color: @success_color; }\n"
-                     ".error { color: @error_color; }";
+                     ".error { color: @error_color; }\n"
+                     ".copy-button { background: transparent; border: none; }";
     gtk_css_provider_load_from_string(css_provider, css);
     gtk_style_context_add_provider_for_display(gtk_widget_get_display(GTK_WIDGET(app_data->window)),
                                               GTK_STYLE_PROVIDER(css_provider),

@@ -26,6 +26,7 @@ void config_init(AppData *app_data) {
     app_data->window_width = 1024;
     app_data->window_height = 768;
     app_data->pane_position = 256;
+    app_data->history_panel_visible = TRUE;
     app_data->ollama_context_size = 2048;
     app_data->theme = g_strdup("light");
     app_data->web_search_enabled = TRUE;
@@ -59,6 +60,9 @@ void config_load(AppData *app_data) {
         }
         if (json_object_object_get_ex(root, "pane_position", &val)) {
             app_data->pane_position = json_object_get_int(val);
+        }
+        if (json_object_object_get_ex(root, "history_panel_visible", &val)) {
+            app_data->history_panel_visible = json_object_get_boolean(val);
         }
         if (json_object_object_get_ex(root, "ollama_context_size", &val)) {
             app_data->ollama_context_size = json_object_get_int(val);
@@ -103,6 +107,7 @@ void config_save(AppData *app_data) {
     json_object_object_add(root, "window_width", json_object_new_int(app_data->window_width));
     json_object_object_add(root, "window_height", json_object_new_int(app_data->window_height));
     json_object_object_add(root, "pane_position", json_object_new_int(app_data->pane_position));
+    json_object_object_add(root, "history_panel_visible", json_object_new_boolean(app_data->history_panel_visible));
     json_object_object_add(root, "ollama_context_size", json_object_new_int(app_data->ollama_context_size));
     if (app_data->theme) {
         json_object_object_add(root, "theme", json_object_new_string(app_data->theme));

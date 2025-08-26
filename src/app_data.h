@@ -27,12 +27,14 @@ typedef struct AppData {
     GtkTextView *text_view;
     GtkTextBuffer *text_buffer;
     GtkButton *send_btn;
+    GtkSpinner *spinner;
     GtkScrolledWindow *chat_scroll;
     
     char **models;
     int model_count;
     char *current_model;
     gboolean is_generating;
+    gboolean request_cancelled;
     
     json_object *messages_array;
     GtkWidget *current_response_widget;
@@ -41,12 +43,14 @@ typedef struct AppData {
     // Chat History
     GtkListBox *history_list_box;
     GListStore *history_store;
+    GtkRevealer *history_revealer;
     char *current_chat_id;
 
     // Configuration
     int window_width;
     int window_height;
     int pane_position;
+    gboolean history_panel_visible;
     int ollama_context_size;
     char *theme;
     gboolean web_search_enabled;
