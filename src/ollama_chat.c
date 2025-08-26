@@ -2,6 +2,7 @@
 #include "app_data.h"
 #include "ui.h"
 #include "ollama_api.h"
+#include "history.h"
 
 #include <stdlib.h>
 
@@ -10,11 +11,24 @@ static AppData *app_data = NULL;
 static void on_activate(GtkApplication *app, gpointer user_data) {
     app_data = g_malloc0(sizeof(AppData));
     app_data->app = app;
-    app_data->messages_array = json_object_new_array();
+    
+    history_init(app_data);
     
     ui_build(app, app_data);
     
-    // Load models
+    history_load_chats(app_data);
+
+    if (g_list_model_get_n_items(G_LIST_MODEL(app_data->history_store)) == 0) {
+        history_start_new_chat(app_data);
+    } else {
+        // Load the first chat in the list
+        GtkListBoxRow *first_row = gtk_list_box_get_row_at_index(app_data->history_list_box, 0);
+        if (first_row) {
+            history_load_selected_chat(app_data->history_list_box, first_row, app_data);
+            gtk_list_box_select_row(app_data->history_list_box, first_row);
+        }
+    }
+    
     api_get_models(app_data);
 }
 
@@ -28,6 +42,7 @@ int main(int argc, char *argv[]) {
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     
     if (app_data) {
+        history_save_chat(app_data); // Save on exit
         if (app_data->models) {
             for (int i = 0; i < app_data->model_count; i++) {
                 free(app_data->models[i]);
@@ -39,6 +54,12 @@ int main(int argc, char *argv[]) {
         }
         if (app_data->messages_array) {
             json_object_put(app_data->messages_array);
+        }
+        if (app_data->current_chat_id) {
+            g_free(app_data->current_chat_id);
+        }
+        if (app_data->history_store) {
+            g_object_unref(app_data->history_store);
         }
         g_free(app_data);
     }

@@ -1,11 +1,11 @@
 PROGRAM = ollama-chat
-SOURCES = ollama_chat.c ollama_api.c ui.c web_search.c
+SOURCES = ollama_chat.c ollama_api.c ui.c web_search.c history.c
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -O2
 DEBUG_CFLAGS = -Wall -Wextra -std=c11 -g -DDEBUG -O0
 PKG_CONFIG_PACKAGES = gtk4 libcurl json-c
 CFLAGS += $(shell pkg-config --cflags $(PKG_CONFIG_PACKAGES))
-LDFLAGS = $(shell pkg-config --libs $(PKG_CONFIG_PACKAGES)) -lpthread
+LDFLAGS = $(shell pkg-config --libs $(PKG_CONFIG_PACKAGES)) -lpthread -luuid
 OBJECTS = $(SOURCES:.c=.o)
 
 all: $(PROGRAM)

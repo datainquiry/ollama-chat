@@ -37,6 +37,11 @@ typedef struct AppData {
     json_object *messages_array;
     GtkWidget *current_response_widget;
     GtkLabel *current_response_label;
+
+    // Chat History
+    GtkListBox *history_list_box;
+    GListStore *history_store;
+    char *current_chat_id;
 } AppData;
 
 #endif // APP_DATA_H
