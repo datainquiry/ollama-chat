@@ -28,6 +28,20 @@ static char *generate_uuid() {
     return uuid_str;
 }
 
+// --- Sorting Helper ---
+typedef struct {
+    char *filename;
+    GDateTime *modified_time;
+} ChatHistoryEntry;
+
+static gint compare_chat_history_entries(gconstpointer a, gconstpointer b, gpointer user_data) {
+    (void)user_data;
+    const ChatHistoryEntry *entry_a = a;
+    const ChatHistoryEntry *entry_b = b;
+    return g_date_time_compare(entry_b->modified_time, entry_a->modified_time);
+}
+
+
 // --- Public Functions ---
 
 void history_init(AppData *app_data) {
@@ -44,11 +58,38 @@ void history_load_chats(AppData *app_data) {
     GDir *dir = g_dir_open(history_path, 0, NULL);
     if (dir) {
         const char *filename;
+        GSList *chat_entries = NULL;
+
         while ((filename = g_dir_read_name(dir))) {
-            GtkStringObject *str_obj = gtk_string_object_new(filename);
-            g_list_store_append(app_data->history_store, str_obj);
+            char *filepath = g_build_filename(history_path, filename, NULL);
+            GFileInfo *file_info = g_file_query_info(g_file_new_for_path(filepath),
+                                                     G_FILE_ATTRIBUTE_TIME_MODIFIED,
+                                                     G_FILE_QUERY_INFO_NONE,
+                                                     NULL, NULL);
+            
+            if (file_info) {
+                GDateTime *modified_time = g_file_info_get_modification_date_time(file_info);
+                ChatHistoryEntry *entry = g_new(ChatHistoryEntry, 1);
+                entry->filename = g_strdup(filename);
+                entry->modified_time = modified_time;
+                chat_entries = g_slist_prepend(chat_entries, entry);
+                g_object_unref(file_info);
+            }
+            g_free(filepath);
         }
         g_dir_close(dir);
+
+        chat_entries = g_slist_sort_with_data(chat_entries, compare_chat_history_entries, NULL);
+
+        for (GSList *l = chat_entries; l != NULL; l = l->next) {
+            ChatHistoryEntry *entry = l->data;
+            GtkStringObject *str_obj = gtk_string_object_new(entry->filename);
+            g_list_store_append(app_data->history_store, str_obj);
+            g_free(entry->filename);
+            g_date_time_unref(entry->modified_time);
+            g_free(entry);
+        }
+        g_slist_free(chat_entries);
     }
     g_free(history_path);
 }
