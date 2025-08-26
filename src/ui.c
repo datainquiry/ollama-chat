@@ -8,6 +8,12 @@
 static void send_message(AppData *app_data);
 static GtkWidget *create_message_widget(const ChatMessage *message);
 static GtkWidget *add_message_to_chat(AppData *app_data, const ChatMessage *message);
+static void on_model_changed(GtkDropDown *dropdown, GParamSpec *pspec, gpointer user_data);
+
+static void on_window_destroy(GtkApplicationWindow *window, gpointer user_data) {
+    AppData *app_data = (AppData *)user_data;
+    gtk_window_get_default_size(GTK_WINDOW(window), &app_data->window_width, &app_data->window_height);
+}
 
 // --- UI update callbacks for g_idle_add ---
 
@@ -66,12 +72,35 @@ static gboolean update_models_dropdown_cb(gpointer data) {
         for (int i = 0; i < app_data->model_count; i++) {
             gtk_string_list_append(string_list, app_data->models[i]);
         }
+
+        gulong handler_id = (gulong)g_object_get_data(G_OBJECT(app_data->model_dropdown), "model-changed-handler-id");
+        if (handler_id > 0) {
+            g_signal_handler_disconnect(app_data->model_dropdown, handler_id);
+        }
+
         gtk_drop_down_set_model(app_data->model_dropdown, G_LIST_MODEL(string_list));
         g_object_unref(string_list);
 
-        if (!app_data->current_model) {
+        guint selected_index = 0;
+        gboolean model_found = FALSE;
+        if (app_data->current_model) {
+            for (int i = 0; i < app_data->model_count; i++) {
+                if (g_strcmp0(app_data->current_model, app_data->models[i]) == 0) {
+                    selected_index = i;
+                    model_found = TRUE;
+                    break;
+                }
+            }
+        }
+
+        if (!model_found) {
+            if (app_data->current_model) g_free(app_data->current_model);
             app_data->current_model = g_strdup(app_data->models[0]);
-            gtk_drop_down_set_selected(app_data->model_dropdown, 0);
+        }
+        gtk_drop_down_set_selected(app_data->model_dropdown, selected_index);
+
+        if (handler_id > 0) {
+            g_signal_connect(app_data->model_dropdown, "notify::selected", G_CALLBACK(on_model_changed), app_data);
         }
 
         gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), TRUE);
@@ -246,14 +275,16 @@ static void send_message(AppData *app_data) {
         char *final_text_to_send = NULL;
         GString *prepended_content = g_string_new("");
 
-        char *url = find_url(stripped_text);
-        if (url) {
-            char *url_content = fetch_url_content(url);
-            if (url_content) {
-                g_string_append_printf(prepended_content, "Content from URL %s:\n\n%s\n\n---\n\n", url, url_content);
-                g_free(url_content);
+        if (app_data->web_search_enabled) {
+            char *url = find_url(stripped_text);
+            if (url) {
+                char *url_content = fetch_url_content(url);
+                if (url_content) {
+                    g_string_append_printf(prepended_content, "Content from URL %s:\n\n%s\n\n---\n\n", url, url_content);
+                    g_free(url_content);
+                }
+                g_free(url);
             }
-            g_free(url);
         }
 
         GRegex *regex = g_regex_new("@[\\w\\d\\._-]+", 0, 0, NULL);
@@ -448,7 +479,14 @@ static GtkWidget* create_history_row(gpointer item, gpointer user_data) {
 void ui_build(GtkApplication *app, AppData *app_data) {
     app_data->window = GTK_WINDOW(gtk_application_window_new(app));
     gtk_window_set_title(app_data->window, "Ollama Chat");
-    gtk_window_set_default_size(app_data->window, 1024, 768);
+    gtk_window_set_default_size(app_data->window, app_data->window_width, app_data->window_height);
+    g_signal_connect(app_data->window, "destroy", G_CALLBACK(on_window_destroy), app_data);
+
+    if (g_strcmp0(app_data->theme, "dark") == 0) {
+        g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", TRUE, NULL);
+    } else {
+        g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", FALSE, NULL);
+    }
 
     // --- Actions for context menu ---
     const GActionEntry app_entries[] = {

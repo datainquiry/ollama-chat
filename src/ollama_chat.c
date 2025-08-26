@@ -3,6 +3,7 @@
 #include "ui.h"
 #include "ollama_api.h"
 #include "history.h"
+#include "config.h"
 
 #include <stdlib.h>
 
@@ -12,6 +13,7 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     app_data = g_malloc0(sizeof(AppData));
     app_data->app = app;
     
+    config_init(app_data);
     history_init(app_data);
     
     ui_build(app, app_data);
@@ -42,7 +44,8 @@ int main(int argc, char *argv[]) {
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     
     if (app_data) {
-        history_save_chat(app_data); // Save on exit
+        config_save(app_data);
+        history_save_chat(app_data);
         if (app_data->models) {
             for (int i = 0; i < app_data->model_count; i++) {
                 free(app_data->models[i]);
@@ -50,7 +53,7 @@ int main(int argc, char *argv[]) {
             free(app_data->models);
         }
         if (app_data->current_model) {
-            free(app_data->current_model);
+            g_free(app_data->current_model);
         }
         if (app_data->messages_array) {
             json_object_put(app_data->messages_array);
@@ -60,6 +63,9 @@ int main(int argc, char *argv[]) {
         }
         if (app_data->history_store) {
             g_object_unref(app_data->history_store);
+        }
+        if (app_data->theme) {
+            g_free(app_data->theme);
         }
         g_free(app_data);
     }

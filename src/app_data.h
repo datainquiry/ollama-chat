@@ -42,6 +42,14 @@ typedef struct AppData {
     GtkListBox *history_list_box;
     GListStore *history_store;
     char *current_chat_id;
+
+    // Configuration
+    int window_width;
+    int window_height;
+    int pane_position;
+    int ollama_context_size;
+    char *theme;
+    gboolean web_search_enabled;
 } AppData;
 
 #endif // APP_DATA_H
