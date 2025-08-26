@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "ollama_api.h"
+#include "web_search.h"
 #include <pthread.h>
 
 // --- UI update callbacks for g_idle_add ---
@@ -190,30 +191,50 @@ static void send_message(AppData *app_data) {
     GtkTextIter start, end;
     gtk_text_buffer_get_bounds(app_data->text_buffer, &start, &end);
     char *text = gtk_text_buffer_get_text(app_data->text_buffer, &start, &end, FALSE);
-    
-    if (text && strlen(g_strstrip(text)) > 0) {
+    char *stripped_text = g_strstrip(text);
+
+    if (stripped_text && strlen(stripped_text) > 0) {
         ChatMessage user_msg = {.is_user = TRUE};
-        strncpy(user_msg.content, text, MAX_MESSAGE_LEN - 1);
+        strncpy(user_msg.content, stripped_text, MAX_MESSAGE_LEN - 1);
         add_message_to_chat(app_data, &user_msg);
-        
+
+        char *url = find_url(stripped_text);
+        char *final_text_to_send = NULL;
+
+        if (url) {
+            char *url_content = fetch_url_content(url);
+            if (url_content) {
+                final_text_to_send = g_strconcat(
+                    "Content from URL ", url, ":\n\n", url_content,
+                    "\n\n---\n\nUser message: ", stripped_text, NULL);
+                g_free(url_content);
+            }
+            g_free(url);
+        }
+
+        if (!final_text_to_send) {
+            final_text_to_send = g_strdup(stripped_text);
+        }
+
         json_object *user_json = json_object_new_object();
         json_object_object_add(user_json, "role", json_object_new_string("user"));
-        json_object_object_add(user_json, "content", json_object_new_string(text));
+        json_object_object_add(user_json, "content", json_object_new_string(final_text_to_send));
         json_object_array_add(app_data->messages_array, user_json);
-        
+
         gtk_text_buffer_set_text(app_data->text_buffer, "", -1);
-        
+
         ChatMessage assistant_msg = {.is_user = FALSE, .content = ""};
         app_data->current_response_widget = add_message_to_chat(app_data, &assistant_msg);
         app_data->current_response_label = GTK_LABEL(g_object_get_data(G_OBJECT(app_data->current_response_widget), "content_label"));
-        
+
         app_data->is_generating = TRUE;
         gtk_button_set_label(app_data->send_btn, "Generating...");
         gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), FALSE);
-        
-        api_send_chat(app_data, g_strdup(text));
+
+        api_send_chat(app_data, final_text_to_send); // Pass the potentially modified text
+        // final_text_to_send is freed in api_send_chat's thread
     }
-    
+
     g_free(text);
 }
 

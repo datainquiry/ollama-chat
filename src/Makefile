@@ -1,5 +1,5 @@
 PROGRAM = ollama-chat
-SOURCES = ollama_chat.c ollama_api.c ui.c
+SOURCES = ollama_chat.c ollama_api.c ui.c web_search.c
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -O2
 DEBUG_CFLAGS = -Wall -Wextra -std=c11 -g -DDEBUG -O0
