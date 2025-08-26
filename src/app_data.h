@@ -3,14 +3,10 @@
 
 #include <gtk/gtk.h>
 #include <json-c/json.h>
+#include "ollama_api.h"
 
 #define MAX_MESSAGE_LEN 8192
 #define MAX_MODELS 50
-
-typedef struct {
-    char *data;
-    size_t size;
-} HttpResponse;
 
 typedef struct {
     char content[MAX_MESSAGE_LEN];

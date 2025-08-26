@@ -31,6 +31,7 @@ static void send_message(AppData *app_data) {
     if (stripped_text && strlen(stripped_text) > 0) {
         ChatMessage user_msg = {.is_user = TRUE};
         strncpy(user_msg.content, stripped_text, MAX_MESSAGE_LEN - 1);
+
         add_message_to_chat(app_data, &user_msg);
 
         char *final_text_to_send = NULL;

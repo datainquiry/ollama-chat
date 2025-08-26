@@ -1,6 +1,8 @@
 #include "ui_callbacks.h"
 #include "history.h"
 #include "ui.h"
+#include "markdown.h"
+#include "ui_chat_view.h"
 
 void on_model_changed(GtkDropDown *dropdown, GParamSpec *pspec, gpointer user_data) {
     (void)pspec;
@@ -28,7 +30,9 @@ static gboolean update_response_label_cb(gpointer data) {
     if (app_data->current_response_label) {
         const char *current = gtk_label_get_text(app_data->current_response_label);
         char *new_text = g_strconcat(current, text, NULL);
-        gtk_label_set_text(app_data->current_response_label, new_text);
+        char *pango_markup = markdown_to_pango(new_text);
+        gtk_label_set_markup(GTK_LABEL(app_data->current_response_label), pango_markup);
+        g_free(pango_markup);
         g_free(new_text);
     }
     g_free(text);
@@ -47,15 +51,26 @@ static gboolean finalize_generation_cb(gpointer data) {
 
     if (app_data->current_response_label) {
         const char *final_text = gtk_label_get_text(app_data->current_response_label);
-        json_object *assistant_msg = json_object_new_object();
-        json_object_object_add(assistant_msg, "role", json_object_new_string("assistant"));
-        json_object_object_add(assistant_msg, "content", json_object_new_string(final_text));
-        json_object_array_add(app_data->messages_array, assistant_msg);
+
+        // Save to history
+        json_object *assistant_msg_json = json_object_new_object();
+        json_object_object_add(assistant_msg_json, "role", json_object_new_string("assistant"));
+        json_object_object_add(assistant_msg_json, "content", json_object_new_string(final_text));
+        json_object_array_add(app_data->messages_array, assistant_msg_json);
         history_save_chat(app_data);
+
+        // Remove the temporary streaming widget
+        gtk_box_remove(app_data->chat_box, app_data->current_response_widget);
+        app_data->current_response_widget = NULL;
+        app_data->current_response_label = NULL;
+
+        // Create and add the final, fully-formatted widget
+        ChatMessage assistant_msg = {.is_user = FALSE};
+        strncpy(assistant_msg.content, final_text, MAX_MESSAGE_LEN - 1);
+        assistant_msg.content[MAX_MESSAGE_LEN - 1] = '\0';
+        add_message_to_chat(app_data, &assistant_msg);
     }
 
-    app_data->current_response_widget = NULL;
-    app_data->current_response_label = NULL;
     return G_SOURCE_REMOVE;
 }
 
@@ -148,4 +163,35 @@ void ui_schedule_reset_send_button(AppData *app_data) {
 
 void ui_schedule_scroll_to_bottom(AppData *app_data) {
     g_idle_add(scroll_to_bottom_cb, app_data);
+}
+
+typedef struct {
+    AppData *app_data;
+    char *status;
+    char *css_class;
+} UpdateStatusData;
+
+static gboolean update_status_label_cb(gpointer data) {
+    UpdateStatusData *update_data = (UpdateStatusData *)data;
+    gtk_label_set_text(update_data->app_data->status_label, update_data->status);
+    gtk_widget_remove_css_class(GTK_WIDGET(update_data->app_data->status_label), "success");
+    gtk_widget_remove_css_class(GTK_WIDGET(update_data->app_data->status_label), "error");
+    if (update_data->css_class) {
+        gtk_widget_add_css_class(GTK_WIDGET(update_data->app_data->status_label), update_data->css_class);
+    }
+    if (g_strcmp0(update_data->status, "Connected") == 0) {
+        gtk_widget_set_sensitive(GTK_WIDGET(update_data->app_data->send_btn), TRUE);
+    }
+    g_free(update_data->status);
+    g_free(update_data->css_class);
+    g_free(update_data);
+    return G_SOURCE_REMOVE;
+}
+
+void ui_schedule_update_status_label(AppData *app_data, const char *status, const char *css_class) {
+    UpdateStatusData *update_data = g_malloc(sizeof(UpdateStatusData));
+    update_data->app_data = app_data;
+    update_data->status = g_strdup(status);
+    update_data->css_class = g_strdup(css_class);
+    g_idle_add(update_status_label_cb, update_data);
 }

@@ -41,6 +41,7 @@ static size_t stream_callback(void *contents, size_t size, size_t nmemb, StreamD
     }
     size_t real_size = size * nmemb;
 
+
     if (stream_data->buffer_pos + real_size >= STREAM_BUFFER_SIZE) {
         fprintf(stderr, "Stream buffer overflow. Increase STREAM_BUFFER_SIZE.\n");
         // Clear buffer and hope for the best
@@ -56,8 +57,6 @@ static size_t stream_callback(void *contents, size_t size, size_t nmemb, StreamD
     char *line_end;
 
     while ((line_end = strchr(line_start, '\n')) != NULL) {
-        *line_end = '\0';
-
         *line_end = '\0';
 
         gboolean has_content = FALSE;
@@ -173,6 +172,8 @@ static void *get_models_thread(void *arg) {
                 }
                 json_object_put(json_obj);
             }
+        } else {
+            ui_schedule_update_status_label(app_data, "Disconnected", "error");
         }
         
         if (response.data) {
@@ -281,5 +282,37 @@ void api_send_chat(AppData *app_data, char *message) {
     thread_data->message = message; // already a copy
     pthread_t thread;
     pthread_create(&thread, NULL, send_chat_thread, thread_data);
+    pthread_detach(thread);
+}
+
+static void *check_connection_thread(void *arg) {
+    AppData *app_data = (AppData *)arg;
+    CURL *curl;
+    CURLcode res;
+    
+    curl = curl_easy_init();
+    if (curl) {
+        char url[256];
+        snprintf(url, sizeof(url), "%s/api/tags", app_data->base_url);
+        
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); // HEAD request
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+        
+        res = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+        
+        if (res == CURLE_OK) {
+            api_get_models(app_data);
+        } else {
+            ui_schedule_update_status_label(app_data, "Disconnected", "error");
+        }
+    }
+    return NULL;
+}
+
+void api_check_connection(AppData *app_data) {
+    pthread_t thread;
+    pthread_create(&thread, NULL, check_connection_thread, app_data);
     pthread_detach(thread);
 }

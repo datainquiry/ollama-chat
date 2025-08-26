@@ -26,15 +26,16 @@ static void on_history_context_menu(GtkGestureClick *gesture, int n_press, doubl
         gtk_widget_set_parent(popover, GTK_WIDGET(app_data->history_list_box));
 
         graphene_rect_t bounds;
-        gtk_widget_compute_bounds(GTK_WIDGET(row), GTK_WIDGET(app_data->history_list_box), &bounds);
-        GdkRectangle rect = {
-            .x = bounds.origin.x,
-            .y = bounds.origin.y,
-            .width = bounds.size.width,
-            .height = bounds.size.height
-        };
+        if (gtk_widget_compute_bounds(GTK_WIDGET(row), GTK_WIDGET(app_data->history_list_box), &bounds)) {
+            GdkRectangle rect = {
+                .x = bounds.origin.x,
+                .y = bounds.origin.y,
+                .width = bounds.size.width,
+                .height = bounds.size.height
+            };
+            gtk_popover_set_pointing_to(GTK_POPOVER(popover), &rect);
+        }
 
-        gtk_popover_set_pointing_to(GTK_POPOVER(popover), &rect);
         gtk_popover_popup(GTK_POPOVER(popover));
         g_object_unref(menu);
     }

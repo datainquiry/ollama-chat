@@ -37,6 +37,7 @@ void config_init(AppData *app_data) {
     app_data->top_k = 40;
     app_data->seed = 0;
     app_data->system_prompt = g_strdup("You are a helpful assistant.");
+    app_data->base_url = g_strdup("http://localhost:11434");
 
     ensure_config_dir_exists();
     config_load(app_data); // Load config or create a default one
@@ -90,6 +91,10 @@ void config_load(AppData *app_data) {
             if (app_data->system_prompt) g_free(app_data->system_prompt);
             app_data->system_prompt = g_strdup(json_object_get_string(val));
         }
+        if (json_object_object_get_ex(root, "base_url", &val)) {
+            if (app_data->base_url) g_free(app_data->base_url);
+            app_data->base_url = g_strdup(json_object_get_string(val));
+        }
         json_object_put(root);
     } else {
         // If file doesn't exist, create it with defaults
@@ -121,6 +126,9 @@ void config_save(AppData *app_data) {
     json_object_object_add(root, "seed", json_object_new_int(app_data->seed));
     if (app_data->system_prompt) {
         json_object_object_add(root, "system_prompt", json_object_new_string(app_data->system_prompt));
+    }
+    if (app_data->base_url) {
+        json_object_object_add(root, "base_url", json_object_new_string(app_data->base_url));
     }
 
     char *filepath = get_config_filepath();

@@ -14,18 +14,18 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     app_data = g_malloc0(sizeof(AppData));
     app_data->app = app;
 
-    const char *ollama_host = g_getenv("OLLAMA_HOST");
-    if (ollama_host) {
-        app_data->base_url = g_strdup(ollama_host);
-    } else {
-        app_data->base_url = g_strdup("http://localhost:11434");
-    }
-    
     // Set the application icon
     GtkIconTheme *icon_theme = gtk_icon_theme_get_for_display(gdk_display_get_default());
     gtk_icon_theme_add_search_path(icon_theme, "/usr/share/icons/hicolor/scalable/apps");
     
     config_init(app_data);
+
+    const char *ollama_host = g_getenv("OLLAMA_HOST");
+    if (ollama_host) {
+        if (app_data->base_url) g_free(app_data->base_url);
+        app_data->base_url = g_strdup(ollama_host);
+    }
+    
     history_init(app_data);
     
     ui_build(app, app_data);
@@ -43,7 +43,7 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
         }
     }
     
-    api_get_models(app_data);
+    api_check_connection(app_data);
 }
 
 int main(int argc, char *argv[]) {

@@ -133,7 +133,32 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     }
     
     gtk_box_append(GTK_BOX(main_box), frame);
-    g_object_set_data(G_OBJECT(main_box), "content_label", NULL); // No single content label anymore
+
+    GtkWidget *content_label = NULL;
+    if (strlen(message->content) > 0) {
+        // If there's initial content, create a label for it
+        char *pango_markup = markdown_to_pango(message->content);
+        content_label = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(content_label), pango_markup);
+        gtk_label_set_wrap(GTK_LABEL(content_label), TRUE);
+        gtk_label_set_wrap_mode(GTK_LABEL(content_label), PANGO_WRAP_WORD_CHAR);
+        gtk_widget_set_halign(content_label, GTK_ALIGN_START);
+        gtk_label_set_selectable(GTK_LABEL(content_label), TRUE);
+        gtk_label_set_xalign(GTK_LABEL(content_label), 0);
+        gtk_box_append(GTK_BOX(message_box), content_label);
+        g_free(pango_markup);
+    } else if (!message->is_user) {
+        // If it's an assistant message with no initial content, create an empty label for streaming
+        content_label = gtk_label_new(NULL);
+        gtk_label_set_wrap(GTK_LABEL(content_label), TRUE);
+        gtk_label_set_wrap_mode(GTK_LABEL(content_label), PANGO_WRAP_WORD_CHAR);
+        gtk_widget_set_halign(content_label, GTK_ALIGN_START);
+        gtk_label_set_selectable(GTK_LABEL(content_label), TRUE);
+        gtk_label_set_xalign(GTK_LABEL(content_label), 0);
+        gtk_box_append(GTK_BOX(message_box), content_label);
+    }
+
+    g_object_set_data(G_OBJECT(main_box), "content_label", content_label);
     return main_box;
 }
 

@@ -11,6 +11,7 @@ void ui_schedule_finalize_generation(AppData *app_data);
 void ui_schedule_update_models_dropdown(AppData *app_data);
 void ui_schedule_reset_send_button(AppData *app_data);
 void ui_schedule_scroll_to_bottom(AppData *app_data);
+void ui_schedule_update_status_label(AppData *app_data, const char *status, const char *css_class);
 
 // Chat view manipulation
 void ui_clear_chat_view(AppData *app_data);
