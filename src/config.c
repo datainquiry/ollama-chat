@@ -30,6 +30,13 @@ void config_init(AppData *app_data) {
     app_data->theme = g_strdup("light");
     app_data->web_search_enabled = TRUE;
 
+    // Ollama Model Parameters
+    app_data->temperature = 0.8;
+    app_data->top_p = 0.9;
+    app_data->top_k = 40;
+    app_data->seed = 0;
+    app_data->system_prompt = g_strdup("You are a helpful assistant.");
+
     ensure_config_dir_exists();
     config_load(app_data); // Load config or create a default one
 }
@@ -63,6 +70,22 @@ void config_load(AppData *app_data) {
         if (json_object_object_get_ex(root, "web_search_enabled", &val)) {
             app_data->web_search_enabled = json_object_get_boolean(val);
         }
+        if (json_object_object_get_ex(root, "temperature", &val)) {
+            app_data->temperature = json_object_get_double(val);
+        }
+        if (json_object_object_get_ex(root, "top_p", &val)) {
+            app_data->top_p = json_object_get_double(val);
+        }
+        if (json_object_object_get_ex(root, "top_k", &val)) {
+            app_data->top_k = json_object_get_int(val);
+        }
+        if (json_object_object_get_ex(root, "seed", &val)) {
+            app_data->seed = json_object_get_int(val);
+        }
+        if (json_object_object_get_ex(root, "system_prompt", &val)) {
+            if (app_data->system_prompt) g_free(app_data->system_prompt);
+            app_data->system_prompt = g_strdup(json_object_get_string(val));
+        }
         json_object_put(root);
     } else {
         // If file doesn't exist, create it with defaults
@@ -85,6 +108,15 @@ void config_save(AppData *app_data) {
         json_object_object_add(root, "theme", json_object_new_string(app_data->theme));
     }
     json_object_object_add(root, "web_search_enabled", json_object_new_boolean(app_data->web_search_enabled));
+
+    // Ollama Model Parameters
+    json_object_object_add(root, "temperature", json_object_new_double(app_data->temperature));
+    json_object_object_add(root, "top_p", json_object_new_double(app_data->top_p));
+    json_object_object_add(root, "top_k", json_object_new_int(app_data->top_k));
+    json_object_object_add(root, "seed", json_object_new_int(app_data->seed));
+    if (app_data->system_prompt) {
+        json_object_object_add(root, "system_prompt", json_object_new_string(app_data->system_prompt));
+    }
 
     char *filepath = get_config_filepath();
     const char *json_str = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);

@@ -50,6 +50,13 @@ typedef struct AppData {
     int ollama_context_size;
     char *theme;
     gboolean web_search_enabled;
+
+    // Ollama Model Parameters
+    double temperature;
+    double top_p;
+    int top_k;
+    int seed;
+    char *system_prompt;
 } AppData;
 
 #endif // APP_DATA_H

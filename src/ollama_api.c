@@ -200,8 +200,31 @@ static void *send_chat_thread(void *arg) {
         
         json_object *payload = json_object_new_object();
         json_object_object_add(payload, "model", json_object_new_string(app_data->current_model));
-        json_object_object_add(payload, "messages", json_object_get(app_data->messages_array));
+
+        // Create a new messages array and add the system prompt if it exists
+        json_object *messages_with_system = json_object_new_array();
+        if (app_data->system_prompt && strlen(app_data->system_prompt) > 0) {
+            json_object *system_msg = json_object_new_object();
+            json_object_object_add(system_msg, "role", json_object_new_string("system"));
+            json_object_object_add(system_msg, "content", json_object_new_string(app_data->system_prompt));
+            json_object_array_add(messages_with_system, system_msg);
+        }
+        // Add the rest of the messages
+        int len = json_object_array_length(app_data->messages_array);
+        for (int i = 0; i < len; i++) {
+            json_object_array_add(messages_with_system, json_object_get(json_object_array_get_idx(app_data->messages_array, i)));
+        }
+        json_object_object_add(payload, "messages", messages_with_system);
+
         json_object_object_add(payload, "stream", json_object_new_boolean(TRUE));
+
+        json_object *options = json_object_new_object();
+        json_object_object_add(options, "temperature", json_object_new_double(app_data->temperature));
+        json_object_object_add(options, "top_p", json_object_new_double(app_data->top_p));
+        json_object_object_add(options, "top_k", json_object_new_int(app_data->top_k));
+        json_object_object_add(options, "seed", json_object_new_int(app_data->seed));
+        json_object_object_add(options, "num_ctx", json_object_new_int(app_data->ollama_context_size));
+        json_object_object_add(payload, "options", options);
         
         const char *json_string = json_object_to_json_string(payload);
         
