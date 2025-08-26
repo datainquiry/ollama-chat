@@ -53,6 +53,8 @@ To build and run Ollama Chat, you will need the following libraries:
 *   GtkSourceView 5
 *   libuuid
 
+### Linux (Debian/Ubuntu)
+
 On a Debian-based system (like Ubuntu), you can install these with:
 ```bash
 sudo apt install libgtk-4-dev libcurl4-openssl-dev libjson-c-dev libgtksourceview-5-dev uuid-dev
@@ -61,6 +63,13 @@ sudo apt install libgtk-4-dev libcurl4-openssl-dev libjson-c-dev libgtksourcevie
 You will also need the **Meson** build system and **Ninja**:
 ```bash
 sudo apt install meson ninja-build
+```
+
+### macOS (Homebrew)
+
+On macOS, you can install these dependencies using [Homebrew](httpshttps://brew.sh/):
+```bash
+brew install gtk4 json-c gtksourceview5 meson ninja ossp-uuid
 ```
 
 ## Building and Running
