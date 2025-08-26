@@ -28,12 +28,10 @@ static gboolean update_response_label_cb(gpointer data) {
     char *text = update_data->text;
 
     if (app_data->current_response_label) {
-        const char *current = gtk_label_get_text(app_data->current_response_label);
-        char *new_text = g_strconcat(current, text, NULL);
-        char *pango_markup = markdown_to_pango(new_text);
+        g_string_append(app_data->response_buffer, text);
+        char *pango_markup = markdown_to_pango(app_data->response_buffer->str);
         gtk_label_set_markup(GTK_LABEL(app_data->current_response_label), pango_markup);
         g_free(pango_markup);
-        g_free(new_text);
     }
     g_free(text);
     g_free(update_data);
@@ -49,8 +47,8 @@ static gboolean finalize_generation_cb(gpointer data) {
     gtk_spinner_stop(app_data->spinner);
     gtk_widget_set_visible(GTK_WIDGET(app_data->spinner), FALSE);
 
-    if (app_data->current_response_label) {
-        const char *final_text = gtk_label_get_text(app_data->current_response_label);
+    if (app_data->current_response_widget) {
+        const char *final_text = app_data->response_buffer->str;
 
         // Save to history
         json_object *assistant_msg_json = json_object_new_object();
@@ -59,16 +57,14 @@ static gboolean finalize_generation_cb(gpointer data) {
         json_object_array_add(app_data->messages_array, assistant_msg_json);
         history_save_chat(app_data);
 
-        // Remove the temporary streaming widget
-        gtk_box_remove(app_data->chat_box, app_data->current_response_widget);
+        // Rerender the widget with the final content
+        rerender_message_widget(app_data->current_response_widget, final_text);
+
         app_data->current_response_widget = NULL;
         app_data->current_response_label = NULL;
-
-        // Create and add the final, fully-formatted widget
-        ChatMessage assistant_msg = {.is_user = FALSE};
-        strncpy(assistant_msg.content, final_text, MAX_MESSAGE_LEN - 1);
-        assistant_msg.content[MAX_MESSAGE_LEN - 1] = '\0';
-        add_message_to_chat(app_data, &assistant_msg);
+        
+        // Clear the buffer for the next response
+        g_string_assign(app_data->response_buffer, "");
     }
 
     return G_SOURCE_REMOVE;

@@ -13,6 +13,7 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     (void)user_data;
     app_data = g_malloc0(sizeof(AppData));
     app_data->app = app;
+    app_data->response_buffer = g_string_new("");
 
     // Set the application icon
     GtkIconTheme *icon_theme = gtk_icon_theme_get_for_display(gdk_display_get_default());
@@ -82,6 +83,7 @@ int main(int argc, char *argv[]) {
         if (app_data->theme) {
             g_free(app_data->theme);
         }
+        g_string_free(app_data->response_buffer, TRUE);
         g_free(app_data);
     }
     

@@ -7,6 +7,7 @@ dependencies = [
   dependency('libcurl'),
   dependency('json-c'),
   dependency('gtksourceview-5'),
+  dependency('glib-2.0'),
   dependency('threads'),
   dependency('uuid'),
 ]

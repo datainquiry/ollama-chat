@@ -77,8 +77,9 @@ static size_t stream_callback(void *contents, size_t size, size_t nmemb, StreamD
                         const char *content = json_object_get_string(content_obj);
 
                         if (content) { // No need to check strlen, send even empty strings from API
-                            char *content_copy = g_strdup(content);
-                            ui_schedule_update_response_label(stream_data->app_data, content_copy);
+                            char *valid_content = g_utf8_make_valid(content, -1);
+                            ui_schedule_update_response_label(stream_data->app_data, valid_content);
+                            // g_free(valid_content) is handled by the UI thread
                         }
                     }
                 }
