@@ -198,23 +198,52 @@ static void send_message(AppData *app_data) {
         strncpy(user_msg.content, stripped_text, MAX_MESSAGE_LEN - 1);
         add_message_to_chat(app_data, &user_msg);
 
-        char *url = find_url(stripped_text);
         char *final_text_to_send = NULL;
+        GString *prepended_content = g_string_new("");
 
+        // Handle URLs
+        char *url = find_url(stripped_text);
         if (url) {
             char *url_content = fetch_url_content(url);
             if (url_content) {
-                final_text_to_send = g_strconcat(
-                    "Content from URL ", url, ":\n\n", url_content,
-                    "\n\n---\n\nUser message: ", stripped_text, NULL);
+                g_string_append_printf(prepended_content, "Content from URL %s:\n\n%s\n\n---\n\n", url, url_content);
                 g_free(url_content);
             }
             g_free(url);
         }
 
-        if (!final_text_to_send) {
+        // Handle file attachments
+        GRegex *regex = g_regex_new("@[\\w\\d\\._-]+", 0, 0, NULL);
+        GMatchInfo *match_info;
+        if (g_regex_match(regex, stripped_text, 0, &match_info)) {
+            while (g_match_info_matches(match_info)) {
+                char *match = g_match_info_fetch(match_info, 0);
+                if (match) {
+                    char *filename = match + 1; // Skip the '@'
+                    char *file_content = NULL;
+                    GError *error = NULL;
+                    if (g_file_get_contents(filename, &file_content, NULL, &error)) {
+                        g_string_append_printf(prepended_content, "Content from file %s:\n\n%s\n\n---\n\n", filename, file_content);
+                        g_free(file_content);
+                    } else {
+                        fprintf(stderr, "Error reading file %s: %s\n", filename, error->message);
+                        g_error_free(error);
+                    }
+                    g_free(match);
+                }
+                g_match_info_next(match_info, NULL);
+            }
+        }
+        if (match_info) g_match_info_free(match_info);
+        if (regex) g_regex_unref(regex);
+
+        if (prepended_content->len > 0) {
+            final_text_to_send = g_strconcat(prepended_content->str, "User message: ", stripped_text, NULL);
+        } else {
             final_text_to_send = g_strdup(stripped_text);
         }
+        g_string_free(prepended_content, TRUE);
+
 
         json_object *user_json = json_object_new_object();
         json_object_object_add(user_json, "role", json_object_new_string("user"));
@@ -231,20 +260,74 @@ static void send_message(AppData *app_data) {
         gtk_button_set_label(app_data->send_btn, "Generating...");
         gtk_widget_set_sensitive(GTK_WIDGET(app_data->send_btn), FALSE);
 
-        api_send_chat(app_data, final_text_to_send); // Pass the potentially modified text
-        // final_text_to_send is freed in api_send_chat's thread
+        api_send_chat(app_data, final_text_to_send);
     }
 
     g_free(text);
 }
 
+static void on_file_chooser_response(GtkNativeDialog *native, int response_id, gpointer user_data) {
+    if (response_id == GTK_RESPONSE_ACCEPT) {
+        AppData *app_data = (AppData *)user_data;
+        GtkFileChooser *chooser = GTK_FILE_CHOOSER(native);
+        GFile *file = gtk_file_chooser_get_file(chooser);
+        if (file) {
+            char *filename = g_file_get_basename(file);
+            if (filename) {
+                GtkTextIter iter;
+                gtk_text_buffer_get_iter_at_mark(app_data->text_buffer, &iter, gtk_text_buffer_get_insert(app_data->text_buffer));
+                
+                // Check if the character at the cursor is already '@'
+                gunichar prev_char = gtk_text_iter_get_char(&iter);
+                if (prev_char != '@') {
+                    // Move back one char to check if the user typed '@'
+                    if (gtk_text_iter_backward_char(&iter)) {
+                        prev_char = gtk_text_iter_get_char(&iter);
+                    }
+                }
+
+                if (prev_char == '@') {
+                    // Overwrite the '@' with the filename
+                     GtkTextIter end_iter = iter;
+                     gtk_text_iter_forward_char(&end_iter);
+                     gtk_text_buffer_delete(app_data->text_buffer, &iter, &end_iter);
+                }
+
+                gtk_text_buffer_insert(app_data->text_buffer, &iter, "@", 1);
+                gtk_text_buffer_insert(app_data->text_buffer, &iter, filename, -1);
+                g_free(filename);
+            }
+            g_object_unref(file);
+        }
+    }
+    g_object_unref(native);
+}
+
+static void open_file_dialog(AppData *app_data) {
+    GtkFileChooserNative *native = gtk_file_chooser_native_new(
+        "Open File",
+        GTK_WINDOW(app_data->window),
+        GTK_FILE_CHOOSER_ACTION_OPEN,
+        "_Open",
+        "_Cancel");
+
+    g_signal_connect(native, "response", G_CALLBACK(on_file_chooser_response), app_data);
+    gtk_native_dialog_show(GTK_NATIVE_DIALOG(native));
+}
+
 static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data) {
     (void)controller;
     (void)keycode;
+    AppData *app_data = (AppData *)user_data;
+
     if (keyval == GDK_KEY_Return && !(state & GDK_SHIFT_MASK)) {
-        send_message((AppData *)user_data);
+        send_message(app_data);
+        return TRUE;
+    } else if (keyval == GDK_KEY_at) {
+        open_file_dialog(app_data);
         return TRUE;
     }
+
     return FALSE;
 }
 
