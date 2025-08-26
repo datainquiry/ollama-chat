@@ -5,78 +5,91 @@
 char *markdown_to_pango(const char *markdown) {
     GString *pango = g_string_new("");
     const char *p = markdown;
-    GList *stack = NULL;
 
     while (*p) {
-        // Bold: **text** -> <b>text</b>
-        if (*p == '*' && *(p + 1) == '*') {
-            if (g_list_find(stack, "<b>")) {
-                g_string_append(pango, "</b>");
-                stack = g_list_remove(stack, "<b>");
-            } else {
-                g_string_append(pango, "<b>");
-                stack = g_list_prepend(stack, "<b>");
-            }
-            p += 2;
-            continue;
-        }
+        // Code block: ```lang\ncode\n```
+        if (strncmp(p, "```", 3) == 0) {
+            const char *end = strstr(p + 3, "```");
+            if (end) {
+                const char *code_start = p + 3;
+                const char *first_newline = strchr(code_start, '\n');
+                if (first_newline && first_newline < end) {
+                    code_start = first_newline + 1;
+                }
 
-        // Italic: *text* -> <i>text</i>
-        if (*p == '*') {
-            if (g_list_find(stack, "<i>")) {
-                g_string_append(pango, "</i>");
-                stack = g_list_remove(stack, "<i>");
-            } else {
-                g_string_append(pango, "<i>");
-                stack = g_list_prepend(stack, "<i>");
-            }
-            p++;
-            continue;
-        }
-
-        // Code: `text` -> <tt>text</tt>
-        if (*p == '`') {
-            if (g_list_find(stack, "<tt>")) {
-                g_string_append(pango, "</tt>");
-                stack = g_list_remove(stack, "<tt>");
-            } else {
+                char *code = g_strndup(code_start, end - code_start);
+                char *escaped_code = g_markup_escape_text(code, -1);
+                
                 g_string_append(pango, "<tt>");
-                stack = g_list_prepend(stack, "<tt>");
+                g_string_append(pango, escaped_code);
+                g_string_append(pango, "</tt>");
+                
+                g_free(code);
+                g_free(escaped_code);
+                p = end + 3;
+                continue;
             }
-            p++;
-            continue;
+        }
+
+        // Bold and Italic
+        if (strncmp(p, "**", 2) == 0) {
+            const char *end = strstr(p + 2, "**");
+            if (end) {
+                char *text = g_strndup(p + 2, end - (p + 2));
+                char *inner_pango = markdown_to_pango(text);
+                g_string_append(pango, "<b>");
+                g_string_append(pango, inner_pango);
+                g_string_append(pango, "</b>");
+                g_free(text);
+                g_free(inner_pango);
+                p = end + 2;
+                continue;
+            }
+        }
+
+        if (*p == '*') {
+            const char *end = strchr(p + 1, '*');
+            if (end) {
+                char *text = g_strndup(p + 1, end - (p + 1));
+                char *inner_pango = markdown_to_pango(text);
+                g_string_append(pango, "<i>");
+                g_string_append(pango, inner_pango);
+                g_string_append(pango, "</i>");
+                g_free(text);
+                g_free(inner_pango);
+                p = end + 1;
+                continue;
+            }
+        }
+
+        // Code: `text`
+        if (*p == '`') {
+            const char *end = strchr(p + 1, '`');
+            if (end) {
+                char *code = g_strndup(p + 1, end - (p + 1));
+                char *escaped_code = g_markup_escape_text(code, -1);
+                g_string_append(pango, "<tt>");
+                g_string_append(pango, escaped_code);
+                g_string_append(pango, "</tt>");
+                g_free(code);
+                g_free(escaped_code);
+                p = end + 1;
+                continue;
+            }
         }
 
         // Escape XML special characters
-        if (g_list_find(stack, "<tt>")) {
-            char *escaped = g_markup_escape_text(p, 1);
-            g_string_append(pango, escaped);
-            g_free(escaped);
+        if (*p == '<') {
+            g_string_append(pango, "&lt;");
+        } else if (*p == '>') {
+            g_string_append(pango, "&gt;");
+        } else if (*p == '&') {
+            g_string_append(pango, "&amp;");
         } else {
-            if (*p == '<') {
-                g_string_append(pango, "&lt;");
-            } else if (*p == '>') {
-                g_string_append(pango, "&gt;");
-            } else if (*p == '&') {
-                g_string_append(pango, "&amp;");
-            } else {
-                g_string_append_c(pango, *p);
-            }
+            g_string_append_c(pango, *p);
         }
         p++;
     }
-
-    // Close any open tags
-    for (GList *l = stack; l != NULL; l = l->next) {
-        if (strcmp(l->data, "<b>") == 0) {
-            g_string_append(pango, "</b>");
-        } else if (strcmp(l->data, "<i>") == 0) {
-            g_string_append(pango, "</i>");
-        } else if (strcmp(l->data, "<tt>") == 0) {
-            g_string_append(pango, "</tt>");
-        }
-    }
-    g_list_free(stack);
 
     return g_string_free(pango, FALSE);
 }

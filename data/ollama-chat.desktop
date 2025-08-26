@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ollama Chat
+Comment=Chat with AI models using Ollama
+Exec=/usr/local/bin/ollama-chat
+Icon=ollama-chat
+Terminal=false
+Categories=Utility;Office;
