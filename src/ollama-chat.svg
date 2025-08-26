@@ -1,0 +1,19 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="chatBubbleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#50E3C2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Chat Bubble -->
+  <path d="M114,10 C119.523,10 124,14.477 124,20 L124,88 C124,93.523 119.523,98 114,98 L34,98 L14,118 L14,98 L14,98 L14,20 C14,14.477 18.477,10 24,10 L114,10 Z" fill="url(#chatBubbleGradient)"/>
+  
+  <!-- Llama Head -->
+  <g transform="translate(35, 25) scale(0.9)">
+    <path d="M45.6,19.2 C45.6,19.2 45.6,42 45.6,42 C45.6,42 36,52.8 36,52.8 C36,52.8 31.2,52.8 31.2,52.8 C31.2,52.8 31.2,60 31.2,60 C31.2,60 48,60 48,60 C48,60 48,67.2 48,67.2 C48,67.2 53.2,67.2 53.2,67.2 C53.2,67.2 53.2,52.8 53.2,52.8 C53.2,52.8 60,48 60,48 C60,48 60,31.2 60,31.2 C60,31.2 52.8,19.2 52.8,19.2 C52.8,19.2 45.6,19.2 45.6,19.2 Z" fill="#FFFFFF"/>
+    <path d="M45.6,19.2 C45.6,19.2 40.8,12 40.8,12 C40.8,12 38.4,14.4 38.4,14.4 L45.6,19.2 Z" fill="#FFFFFF"/>
+    <path d="M52.8,19.2 C52.8,19.2 57.6,12 57.6,12 C57.6,12 60,14.4 60,14.4 L52.8,19.2 Z" fill="#FFFFFF"/>
+    <circle cx="42" cy="36" r="2.5" fill="#4A90E2"/>
+  </g>
+</svg>

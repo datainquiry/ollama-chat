@@ -10,8 +10,13 @@
 static AppData *app_data = NULL;
 
 static void on_activate(GtkApplication *app, gpointer user_data) {
+    (void)user_data;
     app_data = g_malloc0(sizeof(AppData));
     app_data->app = app;
+    
+    // Set the application icon
+    GtkIconTheme *icon_theme = gtk_icon_theme_get_for_display(gdk_display_get_default());
+    gtk_icon_theme_add_search_path(icon_theme, "/usr/share/icons/hicolor/scalable/apps");
     
     config_init(app_data);
     history_init(app_data);
@@ -48,12 +53,15 @@ int main(int argc, char *argv[]) {
         history_save_chat(app_data);
         if (app_data->models) {
             for (int i = 0; i < app_data->model_count; i++) {
-                free(app_data->models[i]);
+                g_free(app_data->models[i]);
             }
             free(app_data->models);
         }
         if (app_data->current_model) {
             g_free(app_data->current_model);
+        }
+        if (app_data->system_prompt) {
+            g_free(app_data->system_prompt);
         }
         if (app_data->messages_array) {
             json_object_put(app_data->messages_array);

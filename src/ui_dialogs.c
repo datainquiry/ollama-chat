@@ -157,6 +157,6 @@ void show_about_dialog(AppData *app_data) {
                           "version", "1.0.0",
                           "copyright", "© 2025, Data Inquiry Consulting LLC",
                           "authors", authors,
-                          "logo-icon-name", "com.example.ollama-chat",
+                          "logo-icon-name", "ollama-chat",
                           NULL);
 }

@@ -1,5 +1,7 @@
 #include "ui_chat_view.h"
 #include "ui_callbacks.h"
+#include "markdown.h"
+#include <gtksourceview/gtksource.h>
 
 static gboolean revert_copy_icon(gpointer user_data) {
     gtk_button_set_icon_name(GTK_BUTTON(user_data), "edit-copy-symbolic");
@@ -7,9 +9,8 @@ static gboolean revert_copy_icon(gpointer user_data) {
 }
 
 static void on_copy_clicked(GtkButton *button, gpointer user_data) {
-    GtkLabel *content_label = GTK_LABEL(user_data);
-    const char *text = gtk_label_get_text(content_label);
-    gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(content_label)), text);
+    const char *text = (const char *)user_data;
+    gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(button)), text);
     gtk_button_set_icon_name(button, "object-select-symbolic");
     g_timeout_add(1000, revert_copy_icon, button);
 }
@@ -29,6 +30,7 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     gtk_widget_set_margin_end(message_box, 12);
     gtk_widget_set_margin_top(message_box, 8);
     gtk_widget_set_margin_bottom(message_box, 8);
+    gtk_widget_set_hexpand(message_box, TRUE);
 
     GtkWidget *header_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     
@@ -40,22 +42,84 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
     gtk_widget_add_css_class(sender_label, "caption");
     gtk_box_append(GTK_BOX(header_box), sender_label);
     
-    GtkWidget *content_label = gtk_label_new(message->content);
-    gtk_label_set_wrap(GTK_LABEL(content_label), TRUE);
-    gtk_label_set_wrap_mode(GTK_LABEL(content_label), PANGO_WRAP_WORD_CHAR);
-    gtk_widget_set_halign(content_label, GTK_ALIGN_START);
-    gtk_label_set_selectable(GTK_LABEL(content_label), TRUE);
-    gtk_label_set_xalign(GTK_LABEL(content_label), 0);
-    
     gtk_box_append(GTK_BOX(message_box), header_box);
-    gtk_box_append(GTK_BOX(message_box), content_label);
+
+    const char *p = message->content;
+    while (*p) {
+        const char *code_start = strstr(p, "```");
+        if (code_start) {
+            // Add text before the code block
+            if (code_start > p) {
+                char *text = g_strndup(p, code_start - p);
+                char *pango_markup = markdown_to_pango(text);
+                GtkWidget *label = gtk_label_new(NULL);
+                gtk_label_set_markup(GTK_LABEL(label), pango_markup);
+                gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+                gtk_label_set_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
+                gtk_widget_set_halign(label, GTK_ALIGN_START);
+                gtk_label_set_selectable(GTK_LABEL(label), TRUE);
+                gtk_label_set_xalign(GTK_LABEL(label), 0);
+                gtk_box_append(GTK_BOX(message_box), label);
+                g_free(text);
+                g_free(pango_markup);
+            }
+
+            // Add the code block
+            const char *code_end = strstr(code_start + 3, "```");
+            if (code_end) {
+                const char *lang_end = strchr(code_start + 3, '\n');
+                char *lang = NULL;
+                if (lang_end && lang_end < code_end) {
+                    lang = g_strndup(code_start + 3, lang_end - (code_start + 3));
+                }
+
+                char *code = g_strndup(lang_end ? lang_end + 1 : code_start + 3, code_end - (lang_end ? lang_end + 1 : code_start + 3));
+
+                GtkSourceLanguageManager *lm = gtk_source_language_manager_get_default();
+                GtkSourceLanguage *language = lang ? gtk_source_language_manager_get_language(lm, lang) : NULL;
+
+                GtkSourceBuffer *buffer = gtk_source_buffer_new(NULL);
+                gtk_source_buffer_set_language(buffer, language);
+                gtk_text_buffer_set_text(GTK_TEXT_BUFFER(buffer), code, -1);
+
+                GtkWidget *source_view = gtk_source_view_new_with_buffer(buffer);
+                gtk_widget_set_hexpand(source_view, TRUE);
+                gtk_source_view_set_show_line_numbers(GTK_SOURCE_VIEW(source_view), TRUE);
+                gtk_text_view_set_editable(GTK_TEXT_VIEW(source_view), FALSE);
+                gtk_widget_add_css_class(source_view, "code-block");
+
+                GtkWidget *scrolled_window = gtk_scrolled_window_new();
+                gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
+                gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), source_view);
+                gtk_box_append(GTK_BOX(message_box), scrolled_window);
+
+                g_free(lang);
+                g_free(code);
+                p = code_end + 3;
+            } else {
+                p = code_start + 3;
+            }
+        } else {
+            // Add the remaining text
+            char *pango_markup = markdown_to_pango(p);
+            GtkWidget *label = gtk_label_new(NULL);
+            gtk_label_set_markup(GTK_LABEL(label), pango_markup);
+            gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+            gtk_label_set_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
+            gtk_widget_set_halign(label, GTK_ALIGN_START);
+            gtk_label_set_selectable(GTK_LABEL(label), TRUE);
+            gtk_label_set_xalign(GTK_LABEL(label), 0);
+            gtk_box_append(GTK_BOX(message_box), label);
+            g_free(pango_markup);
+            break;
+        }
+    }
+    
     gtk_frame_set_child(GTK_FRAME(frame), message_box);
     
     if (message->is_user) {
-        gtk_widget_set_halign(main_box, GTK_ALIGN_END);
         gtk_widget_add_css_class(frame, "user-message");
     } else {
-        gtk_widget_set_halign(main_box, GTK_ALIGN_START);
         gtk_widget_add_css_class(frame, "assistant-message");
 
         GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -64,12 +128,12 @@ static GtkWidget *create_message_widget(const ChatMessage *message) {
 
         GtkWidget *copy_btn = gtk_button_new_from_icon_name("edit-copy-symbolic");
         gtk_widget_add_css_class(copy_btn, "copy-button");
-        g_signal_connect(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), content_label);
+        g_signal_connect(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), (gpointer)message->content);
         gtk_box_append(GTK_BOX(header_box), copy_btn);
     }
     
     gtk_box_append(GTK_BOX(main_box), frame);
-    g_object_set_data(G_OBJECT(main_box), "content_label", content_label);
+    g_object_set_data(G_OBJECT(main_box), "content_label", NULL); // No single content label anymore
     return main_box;
 }
 
