@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 
-// Forward declaration
 typedef struct AppData AppData;
 
 typedef struct {
