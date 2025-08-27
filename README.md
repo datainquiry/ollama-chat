@@ -69,7 +69,7 @@ sudo apt install meson ninja-build
 
 On macOS, you can install these dependencies using [Homebrew](httpshttps://brew.sh/):
 ```bash
-brew install gtk4 json-c gtksourceview5 meson ninja ossp-uuid
+brew install pkgconf gtk4 json-c gtksourceview5 meson ninja ossp-uuid
 ```
 
 ## Building and Running
