@@ -1,18 +1,25 @@
+#include <gtksourceview/gtksource.h>
 #include "ui_chat_view.h"
 #include "ui_callbacks.h"
 #include "markdown.h"
-#include <gtksourceview/gtksource.h>
 
 static gboolean revert_copy_icon(gpointer user_data) {
     gtk_button_set_icon_name(GTK_BUTTON(user_data), "edit-copy-symbolic");
     return G_SOURCE_REMOVE;
 }
 
+/**
+ * Data received by this function has been duplicated. Therefore,
+ * it is deallocated here.
+ */
 static void on_copy_clicked(GtkButton *button, gpointer user_data) {
-    const char *text = (const char *)user_data;
-    gdk_clipboard_set_text(gdk_display_get_clipboard(gtk_widget_get_display(GTK_WIDGET(button))), text);
+    const char* text = (const char*) user_data;
+    gdk_clipboard_set_text(
+            gdk_display_get_clipboard(
+                gtk_widget_get_display(GTK_WIDGET(button))), text);
     gtk_button_set_icon_name(button, "object-select-symbolic");
     g_timeout_add(1000, revert_copy_icon, button);
+    g_free(user_data);
 }
 
 static GtkWidget *create_chat_bubble_header(const ChatMessage *message) {
@@ -108,7 +115,8 @@ static void add_assistant_message_actions(GtkBox *header_box, const char *conten
 
     GtkWidget *copy_btn = gtk_button_new_from_icon_name("edit-copy-symbolic");
     gtk_widget_add_css_class(copy_btn, "copy-button");
-    g_signal_connect_data(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), g_strdup(content), (GClosureNotify)g_free, 0);
+    // `content` is duplicated. The callback should deallocate the buffer.
+    g_signal_connect(copy_btn, "clicked", G_CALLBACK(on_copy_clicked), g_strdup(content));
     gtk_box_append(header_box, copy_btn);
 }
 
