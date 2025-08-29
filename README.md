@@ -93,8 +93,12 @@ sudo apt install meson ninja-build
 On macOS, you can install these dependencies using [Homebrew](httpshttps://brew.sh/):
 
 ```bash
-brew install gtk4 json-c gtksourceview5 meson ninja ossp-uuid
+brew install pkgconf gtk4 json-c gtksourceview5 meson ninja ossp-uuid
 ```
+
+Here is a video showing the compilation/installation process in MacOS:
+
+https://www.youtube.com/watch?v=x4MYediXelg
 
 ## Building and Running
 
@@ -122,6 +126,7 @@ brew install gtk4 json-c gtksourceview5 meson ninja ossp-uuid
 ## Installation
 
 To install the application system-wide (including the `.desktop` file and icon), run:
+
 ```bash
 sudo meson install -C builddir
 ```
@@ -130,9 +135,13 @@ After installation, you should find "Ollama Chat" in your application menu.
 
 ## Configuration
 
-The application stores its configuration in `~/.config/ollama-chat/config.json`. This file is created automatically on the first run and can be edited manually. You can also change most settings through the in-app Preferences dialog.
+The application stores its configuration in
+`~/.config/ollama-chat/config.json`. This file is created automatically on the
+first run and can be edited manually. You can also change most settings through
+the in-app Preferences dialog.
 
 Here is an example of the configuration file:
+
 ```json
 {
   "selected_model": "llama2",
