@@ -5,13 +5,27 @@
 #include <json-c/json.h>
 #include "ollama_api.h"
 
-#define MAX_MESSAGE_LEN 8192
+#define MAX_MESSAGE_LEN 16 * 1024
 #define MAX_MODELS 50
 
 typedef struct {
     char content[MAX_MESSAGE_LEN];
     gboolean is_user;
 } ChatMessage;
+
+// To be used in future refactoring
+typedef struct GuiObject {
+    GtkApplication *app;
+    GtkWindow *window;
+    GtkDropDown *model_dropdown;
+    GtkLabel *status_label;
+    GtkBox *chat_box;
+    GtkTextView *text_view;
+    GtkTextBuffer *text_buffer;
+    GtkButton *send_btn;
+    GtkSpinner *spinner;
+    GtkScrolledWindow *chat_scroll;
+} GuiObject;
 
 typedef struct AppData {
     char *base_url;
@@ -25,24 +39,20 @@ typedef struct AppData {
     GtkButton *send_btn;
     GtkSpinner *spinner;
     GtkScrolledWindow *chat_scroll;
-    
     char **models;
     int model_count;
     char *current_model;
     gboolean is_generating;
     gboolean request_cancelled;
-    
     json_object *messages_array;
     GtkWidget *current_response_widget;
     GtkLabel *current_response_label;
     GString *response_buffer;
-
     // Chat History
     GtkListBox *history_list_box;
     GListStore *history_store;
     GtkRevealer *history_revealer;
     char *current_chat_id;
-
     // Configuration
     int window_width;
     int window_height;
@@ -51,7 +61,6 @@ typedef struct AppData {
     int ollama_context_size;
     char *theme;
     gboolean web_search_enabled;
-
     // Ollama Model Parameters
     double temperature;
     double top_p;
