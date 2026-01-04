@@ -37,7 +37,8 @@ You can provide external context to the model directly from the chat input:
 
 ## Preferences
 
-The Preferences dialog allows you to customize the behavior of the Ollama model:
+The Preferences dialog allows you to customize the behavior of the Ollama
+model:
 
 - Temperature: Controls the randomness of the model's output. Higher
   values (e.g., 1.2) produce more creative responses, while lower values
@@ -73,6 +74,10 @@ To build and run Ollama Chat, you will need the following libraries:
 - json-c
 - GtkSourceView 5
 - libuuid
+
+Here is a video showing the compilation/installation process in MacOS:
+
+https://www.youtube.com/watch?v=x4MYediXelg
 
 ## Building and Running
 
@@ -116,6 +121,7 @@ on the first run and can be edited manually. You can also change most
 settings through the in-app Preferences dialog.
 
 Here is an example of the configuration file:
+
 ```json
 {
   "selected_model": "llama2",

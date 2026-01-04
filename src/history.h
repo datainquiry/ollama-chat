@@ -8,8 +8,10 @@ void history_init(AppData *app_data);
 void history_load_chats(AppData *app_data);
 void history_save_chat(AppData *app_data);
 void history_start_new_chat(AppData *app_data);
-void history_load_selected_chat(GtkListBox *box, GtkListBoxRow *row, gpointer user_data);
+void history_load_selected_chat(GtkListBox *box, GtkListBoxRow *row,
+        gpointer user_data);
 void history_delete_chat(AppData *app_data, const char *chat_id);
-void history_rename_chat(AppData *app_data, const char *chat_id, const char *new_title);
+void history_rename_chat(AppData *app_data, const char *chat_id,
+        const char *new_title);
 
 #endif // HISTORY_H
